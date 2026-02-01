@@ -19,8 +19,7 @@ import com.mappoint.ui.screens.input.InputScreen
 import com.mappoint.ui.screens.map.MapScreen
 import com.mappoint.ui.screens.map.MapViewModel
 import com.mappoint.ui.screens.permissions.PermissionScreen
-import com.mappoint.ui.theme.MapPointTheme
-import com.mappoint.utils.hasAllPermissions
+import com.mappoint.utils.hasLocationPermission
 
 // Определяем экраны приложения
 sealed class Screen(val route: String) {
@@ -33,16 +32,15 @@ sealed class Screen(val route: String) {
 fun OfflineMapApp(
     navController: NavHostController = rememberNavController()
 ) {
-    // Проверяем, нужны ли разрешения
+    // Проверяем, есть ли разрешение на местоположение
     val context = LocalContext.current
-    var shouldShowPermissionsScreen by remember { mutableStateOf(true) }
+    var hasPermission by remember { mutableStateOf(false) }
 
     // Проверяем разрешения при старте
     LaunchedEffect(Unit) {
-        // Решаем, показывать ли экран разрешений
-        // TODO Можно добавить логику "больше не показывать" в настройках
-        shouldShowPermissionsScreen = !hasAllPermissions(context)
+        hasPermission = hasLocationPermission(context)
     }
+
     // Создаем общий ViewModel для карты
     val mapViewModel: MapViewModel = viewModel()
 
@@ -51,29 +49,20 @@ fun OfflineMapApp(
     ) {
         NavHost(
             navController = navController,
-            startDestination = if (shouldShowPermissionsScreen)
-                Screen.Permissions.route
-            else
-                Screen.Map.route
+            startDestination = if (hasPermission) Screen.Map.route else Screen.Permissions.route
         ) {
             // Экран запроса разрешений
             composable(Screen.Permissions.route) {
                 PermissionScreen(
                     onAllPermissionsGranted = {
-                        shouldShowPermissionsScreen = false
-                        navController.navigate(Screen.Map.route) {
-                            popUpTo(Screen.Permissions.route) { inclusive = true }
-                        }
-                    },
-                    onPartialPermissionsGranted = {
-                        // Пользователь дал только часть разрешений
-                        shouldShowPermissionsScreen = false
+                        hasPermission = true
                         navController.navigate(Screen.Map.route) {
                             popUpTo(Screen.Permissions.route) { inclusive = true }
                         }
                     }
                 )
             }
+
             // Экран карты
             composable(Screen.Map.route) {
                 MapScreen(
@@ -83,6 +72,7 @@ fun OfflineMapApp(
                     }
                 )
             }
+
             // Экран ввода координат
             composable(Screen.Input.route) {
                 InputScreen(
@@ -91,6 +81,5 @@ fun OfflineMapApp(
                 )
             }
         }
-
     }
 }

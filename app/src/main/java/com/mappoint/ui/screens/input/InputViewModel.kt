@@ -119,8 +119,7 @@ class InputViewModel : ViewModel() {
                 val lat = latitude.toDouble()
                 val lng = longitude.toDouble()
 
-                // Здесь позже будет сохранение в базу данных
-                // Пока просто показываем успех
+                // TODO: Здесь позже будет сохранение в базу данных
                 _state.update {
                     it.copy(
                         isLoading = false,

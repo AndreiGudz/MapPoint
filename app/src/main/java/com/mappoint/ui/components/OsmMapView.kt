@@ -68,7 +68,7 @@ fun OsmMapView(
                 // Используем Context из MapView или внешний context
                 val markerContext = mapView.context
 
-                // Можно установить свою иконку
+                // TODO: Можно установить свою иконку
                 if (markerData.iconResId != null) {
                     val drawable = ContextCompat.getDrawable(markerContext, markerData.iconResId)
                     marker.icon = drawable

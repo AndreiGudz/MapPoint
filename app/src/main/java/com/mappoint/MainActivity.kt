@@ -53,14 +53,9 @@ class MainActivity : ComponentActivity() {
 
     private fun setupOsmdroidPaths() {
 
-        val osmdroidPath = File(
-            getExternalFilesDir(null),
-            "osmdroid"
-        )
-
+        val osmdroidPath = File(getExternalFilesDir(null), "osmdroid")
         osmdroidPath.mkdirs()
         Configuration.getInstance().osmdroidBasePath = osmdroidPath
-
         // Путь для кеша тайлов
         val tileCachePath = File(osmdroidPath, "tiles")
         tileCachePath.mkdirs()
