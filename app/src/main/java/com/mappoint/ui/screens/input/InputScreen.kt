@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.LocationOn
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import com.mappoint.ui.screens.map.MapViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +59,7 @@ fun InputScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Показываем уведомления при ошибках или успехе
+    // Показываем уведомления при ошибках
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { error ->
             scope.launch {
@@ -67,14 +69,15 @@ fun InputScreen(
         }
     }
 
+    // Обработка успешного добавления точки
     LaunchedEffect(state.isSuccess) {
         if (state.isSuccess) {
             scope.launch {
-                snackbarHostState.showSnackbar("Точка успешно добавлена!")
-                // Добавляем точку на карту
                 inputViewModel.getCoordinates()?.let { (lat, lng) ->
                     mapViewModel.addMarker(lat, lng, state.title)
                 }
+                snackbarHostState.showSnackbar("Точка успешно добавлена!")
+                inputViewModel.onEvent(InputScreenEvent.ResetState)
             }
         }
     }
@@ -85,7 +88,7 @@ fun InputScreen(
                 title = { Text("Ввод координат") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 }
             )
@@ -101,13 +104,12 @@ fun InputScreen(
             }
         },
         bottomBar = {
-            if (state.isLoading) {
-                Box() {
+            Box {
+                if (state.isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier
-                            .align(Alignment.Center)
+                        Modifier
                             .padding(16.dp)
-
+                            .align(Alignment.Center)
                     )
                 }
             }

@@ -1,5 +1,8 @@
 package com.mappoint.ui.screens.map
 
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,8 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocation
 import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -28,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mappoint.ui.components.MarkerData
 import com.mappoint.ui.components.OsmMapView
@@ -42,12 +50,12 @@ fun MapScreen(
     onNavigateToInput: () -> Unit = {}
 ) {
     // Получаем состояния из ViewModel
-    val center by viewModel.center.collectAsState()
-    val zoomLevel by viewModel.zoomLevel.collectAsState()
-    val markers by viewModel.markers.collectAsState()
-    val selectedMarker by viewModel.selectedMarker.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-
+    val center by viewModel.center.collectAsStateWithLifecycle()
+    val zoomLevel by viewModel.zoomLevel.collectAsStateWithLifecycle()
+    val frame by viewModel.frame.collectAsStateWithLifecycle()
+    val markers by viewModel.markers.collectAsStateWithLifecycle()
+    val selectedMarker by viewModel.selectedMarker.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showLocationPermissionDialog by remember { mutableStateOf(false) }
 
@@ -68,6 +76,7 @@ fun MapScreen(
                     // Кнопка для центрирования на текущем местоположении
                     IconButton(
                         onClick = {
+                            Toast.makeText(context, "TODO: Реализовать получение текущего местоположения", Toast.LENGTH_SHORT).show()
                             if (hasLocationPermission(context)) {
                                 // TODO: Реализовать получение текущего местоположения
                                 // viewModel.centerOnMyLocation()
@@ -79,15 +88,27 @@ fun MapScreen(
                         Icon(Icons.Default.MyLocation, contentDescription = "Мое местоположение")
                     }
 
+                    // Кнопка удаления выбранной точки
+                    if (selectedMarker != null) {
+                        IconButton(
+                            onClick = {
+                                selectedMarker?.let { viewModel.removeMarker(it) }
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Удалить точку")
+                        }
+                    }
+
                     // Кнопка очистки всех маркеров
                     IconButton(onClick = { viewModel.clearAllMarkers() }) {
-                        Icon(Icons.Default.ClearAll, contentDescription = "Очистить все")
+                        Icon(Icons.Default.DeleteSweep, contentDescription = "Очистить все")
                     }
                 }
             )
         },
         floatingActionButton = {
             Column {
+                // Кнопка добавления новой точки
                 FloatingActionButton(
                     onClick = onNavigateToInput,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -95,16 +116,17 @@ fun MapScreen(
                     Icon(Icons.Default.AddLocation, contentDescription = "Добавить точку")
                 }
 
+                // Кнопка центрирования на выбранной точке
                 if (selectedMarker != null) {
                     FloatingActionButton(
                         onClick = {
                             selectedMarker?.let {
-                                viewModel.setCenter(it.latitude, it.longitude)
-                                viewModel.setZoom(15.0)
+                                viewModel.centerOnMarker(it, 15.0)
                             }
-                        }
+                        },
+                        modifier = Modifier.padding(bottom = 8.dp)
                     ) {
-                        Icon(Icons.Default.LocationOn, contentDescription = "Центрировать")
+                        Icon(Icons.Default.Navigation, contentDescription = "Центрировать на точке")
                     }
                 }
             }
@@ -120,6 +142,7 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 center = center,
                 zoomLevel = zoomLevel,
+                frame = frame,
                 markers = markerDataList,
                 onMapReady = { mapView ->
                     // TODO: Можно настроить дополнительные параметры карты

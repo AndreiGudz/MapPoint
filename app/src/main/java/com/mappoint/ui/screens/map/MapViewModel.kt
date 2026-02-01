@@ -2,6 +2,7 @@ package com.mappoint.ui.screens.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +23,9 @@ const val maxZoomLevel = 25.0
 const val startZoomLevel = 15.0
 
 class MapViewModel : ViewModel() {
+    // Счётчик для обновления координат
+    private val _frame = MutableStateFlow(0)
+    val frame = _frame.asStateFlow()
 
     // Текущий центр карты
     private val _center = MutableStateFlow(GeoPoint(55.7558, 37.6173)) // Москва по умолчанию
@@ -46,10 +50,12 @@ class MapViewModel : ViewModel() {
     // Функции для управления картой
     fun setCenter(latitude: Double, longitude: Double) {
         _center.value = GeoPoint(latitude, longitude)
+        _frame.value++
     }
 
     fun setZoom(zoom: Double) {
         _zoomLevel.value = zoom.coerceIn(minZoomLevel, maxZoomLevel)
+        _frame.value++
     }
 
     // Добавление маркера
@@ -63,7 +69,7 @@ class MapViewModel : ViewModel() {
 
             _markers.value = _markers.value + newMarker
             _selectedMarker.value = newMarker
-            _center.value = GeoPoint(latitude, longitude)
+            setCenter(latitude, longitude)
         }
     }
 
@@ -89,7 +95,39 @@ class MapViewModel : ViewModel() {
     fun selectMarker(marker: MapPoint?) {
         _selectedMarker.value = marker
         marker?.let {
-            _center.value = GeoPoint(it.latitude, it.longitude)
+            setCenter(it.latitude, it.longitude)
+        }
+    }
+
+    // Центрирование с анимацией
+    fun centerOnMarker(marker: MapPoint, zoom: Double = 15.0) {
+        viewModelScope.launch {
+            setCenter(marker.latitude, marker.longitude)
+            setZoom(zoom)
+            _selectedMarker.value = marker
+        }
+    }
+
+    // Центрирование на последней точке с анимацией
+    fun centerOnLastMarker(zoom: Double = 15.0) {
+        viewModelScope.launch {
+            _markers.value.lastOrNull()?.let { lastMarker ->
+                setCenter(lastMarker.latitude, lastMarker.longitude)
+                setZoom(zoom)
+                _selectedMarker.value = lastMarker
+            }
+        }
+    }
+
+    // Функция для центрирования на конкретных координатах
+    fun centerOnCoordinates(latitude: Double, longitude: Double, zoom: Double = 15.0) {
+        viewModelScope.launch {
+            setCenter(latitude, longitude)
+            setZoom(zoom)
+            // Ищем маркер по координатам
+            _selectedMarker.value = _markers.value.find {
+                it.latitude == latitude && it.longitude == longitude
+            }
         }
     }
 }

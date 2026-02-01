@@ -187,10 +187,10 @@ fun PermissionScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "• Работает полностью оффлайн\n" +
+                    text = "• Способен работать оффлайн оффлайн\n" +
                             "• Сохраняет карты для автономного использования\n" +
                             "• Добавление точек по координатам\n" +
-                            "• Поддержка Bluetooth/Wi-Fi для получения данных",
+                            "• TODO: Поддержка Bluetooth/Wi-Fi для получения данных",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
