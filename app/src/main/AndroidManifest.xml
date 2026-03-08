@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
 
     <!-- Разрешения для местоположения -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <!-- Разрешения для интернета и сети (для загрузки тайлов) -->
     <uses-permission android:name="android.permission.INTERNET" />

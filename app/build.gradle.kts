@@ -76,6 +76,10 @@ dependencies {
     // OSMdroid - Основная библиотека карт
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 
+    // Для определения текущей локации
+    implementation(libs.play.services.location)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+
 /*    // Кеширование тайлов
     implementation("org.osmdroid:osmdroid-geopackage:6.1.20") {
         exclude(group = "com.j256.ormlite", module = "ormlite-core")
@@ -92,8 +96,5 @@ dependencies {
 
     // Bluetooth
     implementation("no.nordicsemi.android:ble:2.11.0")
-    implementation("no.nordicsemi.android:ble-ktx:2.11.0")
-
-    // Для работы с разрешениями в Android Jetpack Compose
-    implementation("com.google.accompanist:accompanist-permissions:0.37.3")*/
+    implementation("no.nordicsemi.android:ble-ktx:2.11.0")*/
 }

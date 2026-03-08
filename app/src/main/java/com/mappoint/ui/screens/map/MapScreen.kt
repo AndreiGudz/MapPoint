@@ -1,7 +1,5 @@
 package com.mappoint.ui.screens.map
 
-import android.content.Context
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,13 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocation
-import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -25,8 +20,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,8 +33,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mappoint.ui.components.MarkerData
 import com.mappoint.ui.components.OsmMapView
 import com.mappoint.utils.hasLocationPermission
-import kotlinx.coroutines.delay
-import org.osmdroid.util.GeoPoint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +48,6 @@ fun MapScreen(
     val selectedMarker by viewModel.selectedMarker.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var showLocationPermissionDialog by remember { mutableStateOf(false) }
 
     // Преобразуем MapPoint в MarkerData для компонента карты
     val markerDataList = markers.map { point ->
@@ -76,12 +66,14 @@ fun MapScreen(
                     // Кнопка для центрирования на текущем местоположении
                     IconButton(
                         onClick = {
-                            Toast.makeText(context, "TODO: Реализовать получение текущего местоположения", Toast.LENGTH_SHORT).show()
                             if (hasLocationPermission(context)) {
-                                // TODO: Реализовать получение текущего местоположения
-                                // viewModel.centerOnMyLocation()
+                                viewModel.centerOnMyLocation()
                             } else {
-                                showLocationPermissionDialog = true
+                                Toast.makeText(
+                                    context,
+                                    "Разрешение на местоположение не предоставлено",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                     ) {
@@ -144,6 +136,7 @@ fun MapScreen(
                 zoomLevel = zoomLevel,
                 frame = frame,
                 markers = markerDataList,
+                markerClickListener = viewModel.getMarkerClickListener(),
                 onMapReady = { mapView ->
                     // TODO: Можно настроить дополнительные параметры карты
                     // например, при загрузке карты

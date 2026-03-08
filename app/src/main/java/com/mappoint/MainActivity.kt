@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
         // Настройка тайлов по умолчанию
         Configuration.getInstance().setUserAgentValue(packageName)
 
+
         setContent {
             MapPointTheme {
                 Surface(

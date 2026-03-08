@@ -1,13 +1,19 @@
 package com.mappoint.ui.screens.map
 
+import android.app.Application
+import android.location.Location
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mappoint.utils.LocationService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 
 // Класс для представления точки на карте
 data class MapPoint(
@@ -22,7 +28,7 @@ const val minZoomLevel = 3.0
 const val maxZoomLevel = 25.0
 const val startZoomLevel = 15.0
 
-class MapViewModel : ViewModel() {
+class MapViewModel(application: Application) : AndroidViewModel(application) {
     // Счётчик для обновления координат
     private val _frame = MutableStateFlow(0)
     val frame = _frame.asStateFlow()
@@ -58,6 +64,24 @@ class MapViewModel : ViewModel() {
         _frame.value++
     }
 
+    private val locationService = LocationService(application)
+
+    // Центрирование на текущем местоположении
+    fun centerOnMyLocation() {
+        viewModelScope.launch {
+            val location = locationService.getCurrentLocation()
+            location?.let {
+                setCenter(it.latitude, it.longitude)
+            }
+        }
+    }
+
+    // Получение потока обновлений местоположения
+    fun getLocationUpdates() = locationService.getLocationUpdates(10000L)
+
+    // Проверка доступности местоположения
+    fun isLocationEnabled(): Boolean = locationService.isLocationEnabled()
+
     // Добавление маркера
     fun addMarker(latitude: Double, longitude: Double, title: String = "") {
         viewModelScope.launch {
@@ -91,14 +115,6 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    // Выбор маркера
-    fun selectMarker(marker: MapPoint?) {
-        _selectedMarker.value = marker
-        marker?.let {
-            setCenter(it.latitude, it.longitude)
-        }
-    }
-
     // Центрирование с анимацией
     fun centerOnMarker(marker: MapPoint, zoom: Double = 15.0) {
         viewModelScope.launch {
@@ -108,26 +124,19 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    // Центрирование на последней точке с анимацией
-    fun centerOnLastMarker(zoom: Double = 15.0) {
-        viewModelScope.launch {
-            _markers.value.lastOrNull()?.let { lastMarker ->
-                setCenter(lastMarker.latitude, lastMarker.longitude)
-                setZoom(zoom)
-                _selectedMarker.value = lastMarker
-            }
+    private fun findMarker(latitude: Double, longitude: Double) : MapPoint? {
+        return _markers.value.find {
+            it.latitude == latitude && it.longitude == longitude
         }
     }
 
-    // Функция для центрирования на конкретных координатах
-    fun centerOnCoordinates(latitude: Double, longitude: Double, zoom: Double = 15.0) {
-        viewModelScope.launch {
-            setCenter(latitude, longitude)
-            setZoom(zoom)
-            // Ищем маркер по координатам
-            _selectedMarker.value = _markers.value.find {
-                it.latitude == latitude && it.longitude == longitude
-            }
+    fun getMarkerClickListener() : Marker.OnMarkerClickListener {
+        return Marker.OnMarkerClickListener { marker, mapView ->
+            marker!!.showInfoWindow()
+            mapView!!.controller
+                .animateTo(marker.position)
+            _selectedMarker.value = findMarker(marker.position.latitude, marker.position.longitude)
+            true
         }
     }
 }
