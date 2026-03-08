@@ -25,19 +25,22 @@ class MainActivity : ComponentActivity() {
         setupOsmdroidPaths()
 
         // Настройки кеширования
-        Configuration.getInstance().tileFileSystemCacheMaxBytes = 1024 * 1024 * 100 // 100 MB
-        Configuration.getInstance().tileFileSystemCacheTrimBytes = 1024 * 1024 * 10  // 10 MB
+        // By default 600 Mb
+        Configuration.getInstance().tileFileSystemCacheMaxBytes = 1024 * 1024 * 1000 // 1000 MB
+        // By default 500 Mb
+        Configuration.getInstance().tileFileSystemCacheTrimBytes = 1024 * 1024 * 100  // 100 MB
         Configuration.getInstance().tileDownloadMaxQueueSize = 1000
+        // By default 2
         Configuration.getInstance().tileDownloadThreads = 8
 
-        // Настройка для оффлайн режима
+        // Настройка для оффлайн режима (происзодит также при возобновлении)
         Configuration.getInstance().load(
             applicationContext,
             getSharedPreferences("osmdroid", MODE_PRIVATE)
         )
 
         // Настройка тайлов по умолчанию
-        Configuration.getInstance().setUserAgentValue(packageName)
+        Configuration.getInstance().userAgentValue = packageName
 
 
         setContent {

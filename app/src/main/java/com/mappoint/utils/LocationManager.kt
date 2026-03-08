@@ -25,32 +25,6 @@ class LocationService(private val context: Context) {
         LocationServices.getFusedLocationProviderClient(context)
 
     /**
-     * Получение последнего известного местоположения
-     * @return Location или null если недоступно
-     */
-    suspend fun getLastKnownLocation(): Location? = suspendCancellableCoroutine { continuation ->
-        if (!hasLocationPermission(context)) {
-            continuation.resume(null)
-            return@suspendCancellableCoroutine
-        }
-
-        fusedLocationClient.lastLocation
-            .addOnSuccessListener { location ->
-                continuation.resume(location)
-            }
-            .addOnFailureListener { exception ->
-                if (continuation.isActive) {
-                    continuation.resume(null)
-                }
-            }
-            .addOnCanceledListener {
-                if (continuation.isActive) {
-                    continuation.resume(null)
-                }
-            }
-    }
-
-    /**
      * Получение одноразового текущего местоположения
      */
     suspend fun getCurrentLocation(): Location? {

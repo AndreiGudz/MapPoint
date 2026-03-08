@@ -80,14 +80,13 @@ dependencies {
     implementation(libs.play.services.location)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
+
+
 /*    // Кеширование тайлов
     implementation("org.osmdroid:osmdroid-geopackage:6.1.20") {
         exclude(group = "com.j256.ormlite", module = "ormlite-core")
         exclude(group = "com.j256.ormlite", module = "ormlite-android")
     }
-
-    // Для работы с файлами
-    implementation("commons-io:commons-io:2.21.0")
 
     // Room для базы данных (история точек)
     implementation("androidx.room:room-runtime:2.8.4")

@@ -13,7 +13,7 @@ import androidx.core.content.ContextCompat
 // Проверка разрешений на местоположение
 fun hasLocationPermission(context: Context): Boolean {
     // Для Android 10+ проверяем оба разрешения
-    return hasFineLocationPermission(context) || hasCoarseLocationPermission(context)
+    return hasFineLocationPermission(context) && hasCoarseLocationPermission(context)
 }
 
 // Проверка точного местоположения (для Android 12+ может потребоваться)

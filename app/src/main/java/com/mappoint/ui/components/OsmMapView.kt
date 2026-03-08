@@ -3,12 +3,16 @@ package com.mappoint.ui.components
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mappoint.ui.screens.map.startZoomLevel
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -27,6 +31,7 @@ fun OsmMapView(
     markerClickListener: Marker.OnMarkerClickListener
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Инициализация osmdroid
     Configuration.getInstance().load(
@@ -50,6 +55,24 @@ fun OsmMapView(
             // Начальная позиция
             controller.setZoom(zoomLevel)
             controller.setCenter(center)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    mapView.onResume()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    mapView.onPause()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

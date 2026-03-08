@@ -25,7 +25,7 @@ data class MapPoint(
 )
 
 const val minZoomLevel = 3.0
-const val maxZoomLevel = 25.0
+const val maxZoomLevel = 17.0
 const val startZoomLevel = 15.0
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {

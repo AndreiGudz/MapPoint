@@ -30,9 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.mappoint.utils.getLocationPermissionDescription
-import com.mappoint.utils.hasLocationPermission
-import com.mappoint.utils.rememberLocationPermissionLauncher
+import com.mappoint.utils.*
 
 @Composable
 fun PermissionScreen(
