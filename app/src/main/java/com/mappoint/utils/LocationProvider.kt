@@ -3,6 +3,7 @@ package com.mappoint.utils
 import android.content.Context
 import android.location.Location
 import android.location.LocationManager
+import android.util.Log
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -17,6 +18,11 @@ class LocationProvider(private val context: Context) {
     private val gpsProvider = GpsMyLocationProvider(context)
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
+    init {
+        gpsProvider.locationUpdateMinTime = 5000        // 5 сек
+        gpsProvider.locationUpdateMinDistance = 10.0f   // 10 метров
+    }
+
     /**
      * Поток обновлений местоположения.
      * Запускается при начале сбора и останавливается при отмене корутины.
@@ -26,13 +32,8 @@ class LocationProvider(private val context: Context) {
             // Вызывается при каждом новом местоположении
             trySend(location)
         }
-
-        // Запускаем провайдер с настройками (можно вынести параметры)
+        // Запускаем провайдер с настройками
         gpsProvider.startLocationProvider(listener)
-        // Можно настроить минимальное время и расстояние:
-        // gpsProvider.setLocationUpdateMinTime(5000) // 5 сек
-        // gpsProvider.setLocationUpdateMinDistance(10f) // 10 метров
-
         // При закрытии канала останавливаем провайдер
         awaitClose {
             gpsProvider.stopLocationProvider()
@@ -65,6 +66,8 @@ class LocationProvider(private val context: Context) {
      * Проверка, включена ли геолокация на устройстве.
      */
     fun isLocationEnabled(): Boolean {
-        return locationManager.isLocationEnabled
+        val gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+        val networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        return locationManager.isLocationEnabled || gpsEnabled || networkEnabled
     }
 }

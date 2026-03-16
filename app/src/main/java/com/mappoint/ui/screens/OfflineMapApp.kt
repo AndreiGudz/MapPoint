@@ -66,7 +66,7 @@ fun OfflineMapApp(
             // Экран карты
             composable(Screen.Map.route) {
                 MapScreen(
-                    viewModel = mapViewModel,
+                    mapViewModel = mapViewModel,
                     onNavigateToInput = {
                         navController.navigate(Screen.Input.route)
                     }

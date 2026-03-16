@@ -2,10 +2,11 @@ package com.mappoint.ui.screens.map
 
 import android.app.Application
 import android.location.Location
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mappoint.utils.LocationService
+import com.mappoint.utils.LocationProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,11 +25,15 @@ data class MapPoint(
     val description: String = ""
 )
 
-const val minZoomLevel = 3.0
-const val maxZoomLevel = 17.0
+const val minZoomLevel = 2.0
+const val maxZoomLevel = 17.9
 const val startZoomLevel = 15.0
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
+
+    // Источник текущей позиции
+    private val locationProvider = LocationProvider(application)
+
     // Счётчик для обновления координат
     private val _frame = MutableStateFlow(0)
     val frame = _frame.asStateFlow()
@@ -36,6 +41,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     // Текущий центр карты
     private val _center = MutableStateFlow(GeoPoint(55.7558, 37.6173)) // Москва по умолчанию
     val center: StateFlow<GeoPoint> = _center.asStateFlow()
+
+    // Последние текущие координаты
+    private val _lastLocation = MutableStateFlow<GeoPoint?>(null)
+    val lastLocation: StateFlow<GeoPoint?> = _lastLocation.asStateFlow()
 
     // Уровень зума
     private val _zoomLevel = MutableStateFlow(startZoomLevel)
@@ -53,6 +62,17 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    init {
+//        Log.d("MapViewModel", "init")
+        // Запускаем подписку на обновления местоположения при создании ViewModel
+        viewModelScope.launch {
+            locationProvider.getLocationFlow().collect { location ->
+                _lastLocation.value = GeoPoint(location.latitude, location.longitude)
+            }
+        }
+        centerOnMyLocation()
+    }
+
     // Функции для управления картой
     fun setCenter(latitude: Double, longitude: Double) {
         _center.value = GeoPoint(latitude, longitude)
@@ -64,16 +84,28 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _frame.value++
     }
 
-
-
     // Центрирование на текущем местоположении
     fun centerOnMyLocation() {
-        viewModelScope.launch {
-            val location = locationService.getCurrentLocation()
-            location?.let {
-                setCenter(it.latitude, it.longitude)
+        if (_lastLocation.value == null) {
+            viewModelScope.launch {
+                _lastLocation.value = fetchCurrentLocationOnce()
             }
         }
+        _lastLocation.value?.let { geoPoint ->
+            setCenter(geoPoint.latitude, geoPoint.longitude)
+        }
+    }
+
+    // Для одноразового запроса
+    suspend fun fetchCurrentLocationOnce(): GeoPoint? {
+        return locationProvider.getCurrentLocation()?.let {
+            GeoPoint(it.latitude, it.longitude)
+        }
+    }
+
+    // Проверка доступности получения текущей позиции
+    fun isLocationEnabled(): Boolean {
+        return locationProvider.isLocationEnabled()
     }
 
     // Добавление маркера

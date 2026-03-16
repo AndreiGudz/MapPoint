@@ -1,5 +1,6 @@
 package com.mappoint.ui.screens.map
 
+import android.annotation.SuppressLint
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,9 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,19 +32,20 @@ import com.mappoint.ui.components.MarkerData
 import com.mappoint.ui.components.OsmMapView
 import com.mappoint.utils.hasLocationPermission
 
+@SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
-    viewModel: MapViewModel = viewModel(),
+    mapViewModel: MapViewModel = viewModel(),
     onNavigateToInput: () -> Unit = {}
 ) {
     // Получаем состояния из ViewModel
-    val center by viewModel.center.collectAsStateWithLifecycle()
-    val zoomLevel by viewModel.zoomLevel.collectAsStateWithLifecycle()
-    val frame by viewModel.frame.collectAsStateWithLifecycle()
-    val markers by viewModel.markers.collectAsStateWithLifecycle()
-    val selectedMarker by viewModel.selectedMarker.collectAsStateWithLifecycle()
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val center by mapViewModel.center.collectAsStateWithLifecycle()
+    val zoomLevel by mapViewModel.zoomLevel.collectAsStateWithLifecycle()
+    val frame by mapViewModel.frame.collectAsStateWithLifecycle()
+    val markers by mapViewModel.markers.collectAsStateWithLifecycle()
+    val selectedMarker by mapViewModel.selectedMarker.collectAsStateWithLifecycle()
+    val isLoading by mapViewModel.isLoading.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Преобразуем MapPoint в MarkerData для компонента карты
@@ -67,13 +66,16 @@ fun MapScreen(
                     IconButton(
                         onClick = {
                             if (hasLocationPermission(context)) {
-                                viewModel.centerOnMyLocation()
+                                if (mapViewModel.isLocationEnabled())
+                                    mapViewModel.centerOnMyLocation()
+                                else
+                                    Toast.makeText(context,
+                                        "Определение местоположения не доступно",
+                                        Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(
-                                    context,
-                                    "Разрешение на местоположение не предоставлено",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                Toast.makeText(context,
+                                    "Разрешение на получения местоположения не предоставлено",
+                                    Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
@@ -84,7 +86,7 @@ fun MapScreen(
                     if (selectedMarker != null) {
                         IconButton(
                             onClick = {
-                                selectedMarker?.let { viewModel.removeMarker(it) }
+                                selectedMarker?.let { mapViewModel.removeMarker(it) }
                             }
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = "Удалить точку")
@@ -92,7 +94,7 @@ fun MapScreen(
                     }
 
                     // Кнопка очистки всех маркеров
-                    IconButton(onClick = { viewModel.clearAllMarkers() }) {
+                    IconButton(onClick = { mapViewModel.clearAllMarkers() }) {
                         Icon(Icons.Default.DeleteSweep, contentDescription = "Очистить все")
                     }
                 }
@@ -113,7 +115,7 @@ fun MapScreen(
                     FloatingActionButton(
                         onClick = {
                             selectedMarker?.let {
-                                viewModel.centerOnMarker(it, 15.0)
+                                mapViewModel.centerOnMarker(it, 15.0)
                             }
                         },
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -136,11 +138,7 @@ fun MapScreen(
                 zoomLevel = zoomLevel,
                 frame = frame,
                 markers = markerDataList,
-                markerClickListener = viewModel.getMarkerClickListener(),
-                onMapReady = { mapView ->
-                    // TODO: Можно настроить дополнительные параметры карты
-                    // например, при загрузке карты
-                }
+                markerClickListener = mapViewModel.getMarkerClickListener(),
             )
 
             // Индикатор загрузки
