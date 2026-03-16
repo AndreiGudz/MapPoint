@@ -18,7 +18,7 @@ import androidx.navigation.compose.rememberNavController
 import com.mappoint.ui.screens.input.InputScreen
 import com.mappoint.ui.screens.map.MapScreen
 import com.mappoint.ui.screens.map.MapViewModel
-import com.mappoint.ui.screens.permissions.PermissionScreen
+import com.mappoint.ui.screens.permission.PermissionScreen
 import com.mappoint.utils.hasLocationPermission
 
 // Определяем экраны приложения

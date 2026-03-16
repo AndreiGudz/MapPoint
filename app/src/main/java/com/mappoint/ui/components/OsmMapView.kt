@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -14,11 +15,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mappoint.ui.screens.map.startZoomLevel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 @Composable
 fun OsmMapView(
@@ -31,6 +36,7 @@ fun OsmMapView(
     markerClickListener: Marker.OnMarkerClickListener
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Инициализация osmdroid
@@ -76,7 +82,7 @@ fun OsmMapView(
         }
     }
 
-    // Обрабатываем анимацию
+    // Обрабатываем анимацию перемещения
     LaunchedEffect(frame) {
         mapView.controller.animateTo(center, zoomLevel, 1000L)
         Log.d("OsmMapView", "Animating to: $center, zoom: $zoomLevel")
@@ -117,9 +123,27 @@ fun OsmMapView(
         factory = { mapView }
     )
 
+    // 1. Создание оверлея
+    val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), mapView)
+
+    // 2. Настройка оверлея
+    locationOverlay.enableMyLocation() // Включить определение местоположения
+    locationOverlay.enableFollowLocation() // Карта будет следовать за пользователем
+    locationOverlay.isDrawAccuracyEnabled = true // Отображать радиус точности
+
+    // 3. Добавление оверлея на карту
+    mapView.overlays.add(locationOverlay)
+
     // Вызываем callback когда карта готова
     LaunchedEffect(Unit) {
         onMapReady(mapView)
+
+        // 4. Центрировать на пользователе при старте
+        locationOverlay.runOnFirstFix {
+            scope.launch(Dispatchers.Main) {
+                mapView.controller.animateTo(locationOverlay.myLocation)
+            }
+        }
     }
 }
 

@@ -64,7 +64,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _frame.value++
     }
 
-    private val locationService = LocationService(application)
+
 
     // Центрирование на текущем местоположении
     fun centerOnMyLocation() {
@@ -75,12 +75,6 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-
-    // Получение потока обновлений местоположения
-    fun getLocationUpdates() = locationService.getLocationUpdates(10000L)
-
-    // Проверка доступности местоположения
-    fun isLocationEnabled(): Boolean = locationService.isLocationEnabled()
 
     // Добавление маркера
     fun addMarker(latitude: Double, longitude: Double, title: String = "") {

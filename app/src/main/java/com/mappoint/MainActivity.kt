@@ -39,6 +39,8 @@ class MainActivity : ComponentActivity() {
             getSharedPreferences("osmdroid", MODE_PRIVATE)
         )
 
+
+
         setContent {
             MapPointTheme {
                 Surface(
