@@ -30,18 +30,14 @@ class MainActivity : ComponentActivity() {
         // By default 500 Mb
         Configuration.getInstance().tileFileSystemCacheTrimBytes = 1024 * 1024 * 100  // 100 MB
         Configuration.getInstance().tileDownloadMaxQueueSize = 1000
-        // By default 2
-        Configuration.getInstance().tileDownloadThreads = 8
+        // Просят не использовать более 2х потоков загрузки тайлов
+        Configuration.getInstance().tileDownloadThreads = 2
 
         // Настройка для оффлайн режима (происзодит также при возобновлении)
         Configuration.getInstance().load(
             applicationContext,
             getSharedPreferences("osmdroid", MODE_PRIVATE)
         )
-
-        // Настройка тайлов по умолчанию
-        Configuration.getInstance().userAgentValue = packageName
-
 
         setContent {
             MapPointTheme {
@@ -56,7 +52,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setupOsmdroidPaths() {
-
+        // путь к папке по умолчанию для osmdroid
         val osmdroidPath = File(getExternalFilesDir(null), "osmdroid")
         osmdroidPath.mkdirs()
         Configuration.getInstance().osmdroidBasePath = osmdroidPath
