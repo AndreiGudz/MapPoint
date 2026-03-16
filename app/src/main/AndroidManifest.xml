@@ -22,6 +22,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Для Bluetooth -->
+    <!-- Для Android 10-11 -->
     <uses-permission android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
@@ -62,7 +63,7 @@
             android:value="/storage/emulated/0/Android/data/com.mappoint/files/osmdroid" />
         <meta-data
             android:name="android.osmdroid.tileDownloadThreads"
-            android:value="8" />
+            android:value="2" />
         <meta-data
             android:name="android.osmdroid.tileDownloadMaxQueueSize"
             android:value="1000" />
