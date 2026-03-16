@@ -104,7 +104,12 @@ fun MapScreen(
             Column {
                 // Кнопка добавления новой точки
                 FloatingActionButton(
-                    onClick = onNavigateToInput,
+                    onClick = {
+                        onNavigateToInput()
+                        selectedMarker?.let {
+                            mapViewModel.centerOnMarker(it, 15.0)
+                        }
+                    },
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
                     Icon(Icons.Default.AddLocation, contentDescription = "Добавить точку")

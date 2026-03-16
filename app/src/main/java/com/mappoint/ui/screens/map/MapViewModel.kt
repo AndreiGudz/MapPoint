@@ -15,6 +15,9 @@ import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // Класс для представления точки на карте
 data class MapPoint(
@@ -70,7 +73,6 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 _lastLocation.value = GeoPoint(location.latitude, location.longitude)
             }
         }
-        centerOnMyLocation()
     }
 
     // Функции для управления картой
@@ -91,8 +93,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 _lastLocation.value = fetchCurrentLocationOnce()
             }
         }
+        val formatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
         _lastLocation.value?.let { geoPoint ->
             setCenter(geoPoint.latitude, geoPoint.longitude)
+            addMarker(geoPoint.latitude, geoPoint.longitude, "Текущая в ${formatter.format(Date())}")
         }
     }
 
@@ -109,6 +113,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Добавление маркера
+    fun addMarker(point: GeoPoint, title: String = "") {
+        addMarker(point.latitude, point.longitude, title)
+    }
     fun addMarker(latitude: Double, longitude: Double, title: String = "") {
         viewModelScope.launch {
             val newMarker = MapPoint(

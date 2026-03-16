@@ -5,12 +5,7 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -19,8 +14,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mappoint.ui.screens.map.startZoomLevel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.library.R
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -28,10 +21,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
-import org.osmdroid.views.overlay.mylocation.IMyLocationConsumer
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
-import kotlin.coroutines.resume
-import androidx.lifecycle.compose.currentStateAsState
 
 @Composable
 fun OsmMapView(
@@ -46,7 +36,7 @@ fun OsmMapView(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Проверяем, уничтожается ли активность
-    val mapView = remember(context) {
+    val mapView = remember {
         Configuration.getInstance().load(
             context,
             context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
@@ -70,7 +60,7 @@ fun OsmMapView(
         MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).apply {
             // Настройка оверлея
             enableMyLocation() // Включить определение местоположения
-            enableFollowLocation() // Карта будет следовать за пользователем
+//            enableFollowLocation() // Карта будет следовать за пользователем
             isDrawAccuracyEnabled = true // Отображать радиус точности
         }
 
@@ -90,9 +80,16 @@ fun OsmMapView(
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     mapView.onResume()
+                    myLocationOverlay.enableMyLocation()
+                    myLocationOverlay.enableFollowLocation()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     mapView.onPause()
+                    myLocationOverlay.disableMyLocation()
+                    myLocationOverlay.disableFollowLocation()
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    mapView.onDetach()
                 }
                 else -> {}
             }
@@ -105,17 +102,15 @@ fun OsmMapView(
 
     // Обрабатываем анимацию перемещения
     LaunchedEffect(frame) {
-        mapView.controller.animateTo(center, zoomLevel, 1000L)
+        myLocationOverlay.disableFollowLocation()
+//        mapView.controller.animateTo(center, zoomLevel, 1000L)
+        mapView.controller.setCenter(center)
+        mapView.controller.setZoom(zoomLevel)
     }
 
     // Обновляем маркеры при изменении списка
     LaunchedEffect(markers) {
-        mapView.overlays.removeIf { it is Marker }
-        markers.forEach { markerData ->
-            val marker = getMarker(mapView, markerData, context, markerClickListener)
-            mapView.overlays.add(marker)
-        }
-        mapView.invalidate()
+        updateMarkers(mapView, markers, context, markerClickListener)
     }
 
     // Вставляем MapView в Compose
@@ -125,8 +120,8 @@ fun OsmMapView(
     )
 }
 
-// получение маркера для MapView из MarkerData
-private fun getMarker(
+// создание маркера для MapView из MarkerData
+private fun createMarker(
     mapView: MapView,
     markerData: MarkerData,
     context: Context,
@@ -136,12 +131,26 @@ private fun getMarker(
     title = markerData.title
     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
     setOnMarkerClickListener(markerClickListener)
-    // Установка иконки
     icon = if (markerData.iconResId != null) {
         ContextCompat.getDrawable(context, markerData.iconResId)
     } else {
         ContextCompat.getDrawable(context, R.drawable.osm_ic_follow_me_on)
     }
+}
+
+// Вспомогательная функция для обновления маркеров
+private fun updateMarkers(
+    mapView: MapView,
+    markers: List<MarkerData>,
+    context: Context,
+    markerClickListener: Marker.OnMarkerClickListener
+) {
+    mapView.overlays.removeIf { it is Marker }
+    markers.forEach { markerData ->
+        val marker = createMarker(mapView, markerData, context, markerClickListener)
+        mapView.overlays.add(marker)
+    }
+    mapView.invalidate()
 }
 
 // Data class для маркеров
