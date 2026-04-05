@@ -15,10 +15,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mappoint.ui.screens.map.startZoomLevel
 import org.osmdroid.config.Configuration
+import org.osmdroid.library.R
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 @Composable
 fun OsmMapView(
@@ -27,45 +30,66 @@ fun OsmMapView(
     frame: Int = 0,
     zoomLevel: Double = startZoomLevel,
     markers: List<MarkerData> = emptyList(),
-    onMapReady: (MapView) -> Unit = {},
-    markerClickListener: Marker.OnMarkerClickListener
+    markerClickListener: Marker.OnMarkerClickListener,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Инициализация osmdroid
-    Configuration.getInstance().load(
-        context,
-        context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
-    )
-
-    // Создаем MapView и сохраняем ссылку
+    // Проверяем, уничтожается ли активность
     val mapView = remember {
+        Configuration.getInstance().load(
+            context,
+            context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
+        )
         MapView(context).apply {
             // Настройка карты
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             minZoomLevel = com.mappoint.ui.screens.map.minZoomLevel
             maxZoomLevel = com.mappoint.ui.screens.map.maxZoomLevel
-
             // Настройка кеширования для оффлайн работы
-            setUseDataConnection(true)
+            setUseDataConnection(true)  // можно использовать интернет
             tileProvider.tileSource = TileSourceFactory.MAPNIK
-
-            // Начальная позиция
-            controller.setZoom(zoomLevel)
             controller.setCenter(center)
+            controller.setZoom(zoomLevel)
         }
     }
 
+    // Создание оверлея текущей позиции
+    val myLocationOverlay = remember {
+        MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).apply {
+            // Настройка оверлея
+            enableMyLocation() // Включить определение местоположения
+//            enableFollowLocation() // Карта будет следовать за пользователем
+            isDrawAccuracyEnabled = true // Отображать радиус точности
+        }
+
+    }
+    // Добавление оверлея текущей позиции на карту
+    DisposableEffect(Unit) {
+        mapView.overlays.add(myLocationOverlay)
+        onDispose {
+            mapView.overlays.remove(myLocationOverlay)
+            myLocationOverlay.onDetach(mapView)
+        }
+    }
+
+    // Для отслеживания жизненного цикла приложения и реакции на Запуск/Паузу
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     mapView.onResume()
+                    myLocationOverlay.enableMyLocation()
+                    myLocationOverlay.enableFollowLocation()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
                     mapView.onPause()
+                    myLocationOverlay.disableMyLocation()
+                    myLocationOverlay.disableFollowLocation()
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    mapView.onDetach()
                 }
                 else -> {}
             }
@@ -76,39 +100,17 @@ fun OsmMapView(
         }
     }
 
-    // Обрабатываем анимацию
+    // Обрабатываем анимацию перемещения
     LaunchedEffect(frame) {
-        mapView.controller.animateTo(center, zoomLevel, 1000L)
-        Log.d("OsmMapView", "Animating to: $center, zoom: $zoomLevel")
+        myLocationOverlay.disableFollowLocation()
+//        mapView.controller.animateTo(center, zoomLevel, 1000L)
+        mapView.controller.setCenter(center)
+        mapView.controller.setZoom(zoomLevel)
     }
 
     // Обновляем маркеры при изменении списка
     LaunchedEffect(markers) {
-        mapView.overlays.removeIf { it is Marker }
-
-        markers.forEach { markerData ->
-            val marker = Marker(mapView)
-            marker.position = GeoPoint(markerData.latitude, markerData.longitude)
-            marker.title = markerData.title
-            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            marker.setOnMarkerClickListener(markerClickListener)
-
-            // Установка иконки
-            if (markerData.iconResId != null) {
-                val drawable = ContextCompat.getDrawable(context, markerData.iconResId)
-                marker.icon = drawable
-            } else {
-                // Стандартная иконка
-                marker.icon = ContextCompat.getDrawable(
-                    context,
-                    org.osmdroid.library.R.drawable.osm_ic_follow_me_on
-                )
-            }
-
-            mapView.overlays.add(marker)
-        }
-
-        mapView.invalidate()
+        updateMarkers(mapView, markers, context, markerClickListener)
     }
 
     // Вставляем MapView в Compose
@@ -116,11 +118,39 @@ fun OsmMapView(
         modifier = modifier,
         factory = { mapView }
     )
+}
 
-    // Вызываем callback когда карта готова
-    LaunchedEffect(Unit) {
-        onMapReady(mapView)
+// создание маркера для MapView из MarkerData
+private fun createMarker(
+    mapView: MapView,
+    markerData: MarkerData,
+    context: Context,
+    markerClickListener: Marker.OnMarkerClickListener
+): Marker = Marker(mapView).apply {
+    position = GeoPoint(markerData.latitude, markerData.longitude)
+    title = markerData.title
+    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+    setOnMarkerClickListener(markerClickListener)
+    icon = if (markerData.iconResId != null) {
+        ContextCompat.getDrawable(context, markerData.iconResId)
+    } else {
+        ContextCompat.getDrawable(context, R.drawable.osm_ic_follow_me_on)
     }
+}
+
+// Вспомогательная функция для обновления маркеров
+private fun updateMarkers(
+    mapView: MapView,
+    markers: List<MarkerData>,
+    context: Context,
+    markerClickListener: Marker.OnMarkerClickListener
+) {
+    mapView.overlays.removeIf { it is Marker }
+    markers.forEach { markerData ->
+        val marker = createMarker(mapView, markerData, context, markerClickListener)
+        mapView.overlays.add(marker)
+    }
+    mapView.invalidate()
 }
 
 // Data class для маркеров

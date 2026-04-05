@@ -77,8 +77,9 @@ dependencies {
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     // Для определения текущей локации
-    implementation(libs.play.services.location)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    // заменяется на реализацию от osmdroid : GpsMyLocationProvider
+//    implementation(libs.play.services.location)
+//    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
 
 
