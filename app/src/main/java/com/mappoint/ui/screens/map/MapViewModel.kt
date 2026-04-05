@@ -157,12 +157,19 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Получени маркера по широте и долготе
     private fun findMarker(latitude: Double, longitude: Double) : MapPoint? {
         return _markers.value.find {
             it.latitude == latitude && it.longitude == longitude
         }
     }
 
+    // Проверка наличия маркеров
+    fun hasMarkers(): Boolean {
+        return _markers.value.isNotEmpty()
+    }
+
+    // Получить регирование на нажатие на маркер
     fun getMarkerClickListener() : Marker.OnMarkerClickListener {
         return Marker.OnMarkerClickListener { marker, mapView ->
             marker!!.showInfoWindow()
