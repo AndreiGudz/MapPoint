@@ -1,0 +1,400 @@
+package com.mappoint.utils.bluetooth
+
+import android.Manifest
+import android.bluetooth.*
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
+import androidx.annotation.RequiresPermission
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.*
+
+class BluetoothClassicManager(private val context: Context) {
+
+    companion object {
+        private const val TAG = "BluetoothManager"
+        val MY_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+    }
+
+    private val bluetoothAdapter: BluetoothAdapter? by lazy {
+        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothManager.adapter
+    }
+
+    private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+    val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private val _discoveredDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
+    val discoveredDevices: StateFlow<List<BluetoothDevice>> = _discoveredDevices.asStateFlow()
+
+    private val _incomingData = MutableSharedFlow<BluetoothData>()
+    val incomingData: SharedFlow<BluetoothData> = _incomingData.asSharedFlow()
+
+    private var currentDevice: BluetoothDevice? = null
+    private var bluetoothSocket: BluetoothSocket? = null
+    private var inputStream: InputStream? = null
+    private var outputStream: OutputStream? = null
+
+    private var receiveJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val discoveryReceiver = object : BroadcastReceiver() {
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT) // BLUETOOTH_CONNECT проверяется в checkBluetoothPermissions
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    if (checkBluetoothPermissions()) {
+                        val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        }
+                        if (device != null && device.name != null) {
+                            addDeviceIfNew(device)
+                        }
+                    }
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                    Log.d(TAG, "Discovery finished")
+                }
+            }
+        }
+    }
+
+    init {
+        if (checkBluetoothPermissions()) {
+            registerReceivers()
+        } else {
+            Log.e(TAG, "Missing Bluetooth permissions")
+        }
+    }
+
+    private fun checkBluetoothPermissions(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun registerReceivers() {
+        try {
+            val filter = IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_FOUND)
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+            }
+            context.registerReceiver(discoveryReceiver, filter)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering receiver: ${e.message}")
+        }
+    }
+
+    private fun addDeviceIfNew(device: BluetoothDevice) {
+        val currentDevices = _discoveredDevices.value.toMutableList()
+        if (currentDevices.none { it.address == device.address }) {
+            currentDevices.add(device)
+            _discoveredDevices.value = currentDevices
+        }
+    }
+
+    fun isBluetoothEnabled(): Boolean {
+        return try {
+            bluetoothAdapter?.isEnabled == true
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception checking Bluetooth state: ${e.message}")
+            false
+        }
+    }
+
+    fun getEnableBluetoothIntent(): Intent {
+        return Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+    }
+
+    fun startDiscovery() {
+        if (!checkBluetoothPermissions()) {
+            Log.e(TAG, "Missing permissions for discovery")
+            return
+        }
+
+        if (!isBluetoothEnabled()) {
+            Log.e(TAG, "Bluetooth not enabled")
+            return
+        }
+
+        try {
+            if (bluetoothAdapter?.isDiscovering == true) {
+                bluetoothAdapter?.cancelDiscovery()
+            }
+
+            _discoveredDevices.value = emptyList()
+            bluetoothAdapter?.startDiscovery()
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception starting discovery: ${e.message}")
+        }
+    }
+
+    fun stopDiscovery() {
+        if (!checkBluetoothPermissions()) {
+            return
+        }
+
+        try {
+            if (bluetoothAdapter?.isDiscovering == true) {
+                bluetoothAdapter?.cancelDiscovery()
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception stopping discovery: ${e.message}")
+        }
+    }
+
+    suspend fun connectToDevice(device: BluetoothDevice): Boolean = withContext(Dispatchers.IO) {
+        if (!checkBluetoothPermissions()) {
+            Log.e(TAG, "Missing permissions for connection")
+            return@withContext false
+        }
+
+        try {
+            disconnect()
+            stopDiscovery()
+
+            currentDevice = device
+            _connectionState.value = ConnectionState.CONNECTING
+
+            bluetoothSocket = try {
+                device.createRfcommSocketToServiceRecord(MY_UUID)
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Security exception creating socket: ${e.message}")
+                return@withContext false
+            }
+
+            bluetoothSocket?.connect()
+
+            inputStream = bluetoothSocket?.inputStream
+            outputStream = bluetoothSocket?.outputStream
+
+            _connectionState.value = ConnectionState.CONNECTED
+            Log.d(TAG, "Connected to ${device.name}")
+
+            startReceiving()
+
+            return@withContext true
+        } catch (e: IOException) {
+            Log.e(TAG, "Connection failed: ${e.message}")
+            _connectionState.value = ConnectionState.DISCONNECTED
+            closeSocket()
+            return@withContext false
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception during connection: ${e.message}")
+            _connectionState.value = ConnectionState.DISCONNECTED
+            closeSocket()
+            return@withContext false
+        }
+    }
+
+    suspend fun sendData(data: String): Boolean = withContext(Dispatchers.IO) {
+        if (!checkBluetoothPermissions()) {
+            return@withContext false
+        }
+
+        return@withContext try {
+            val bytes = data.toByteArray(Charsets.UTF_8)
+            outputStream?.write(bytes)
+            outputStream?.flush()
+
+            val bluetoothData = BluetoothData(
+                type = DataType.OUTGOING,
+                data = data,
+                deviceAddress = currentDevice?.address ?: "",
+                timestamp = System.currentTimeMillis()
+            )
+            _incomingData.emit(bluetoothData)
+
+            Log.d(TAG, "Sent: $data")
+            true
+        } catch (e: IOException) {
+            Log.e(TAG, "Send failed: ${e.message}")
+            false
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception sending data: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun sendBytes(data: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        if (!checkBluetoothPermissions()) {
+            return@withContext false
+        }
+
+        return@withContext try {
+            outputStream?.write(data)
+            outputStream?.flush()
+
+            val bluetoothData = BluetoothData(
+                type = DataType.OUTGOING,
+                data = data.joinToString(",") { it.toString() },
+                deviceAddress = currentDevice?.address ?: "",
+                timestamp = System.currentTimeMillis(),
+                isBinary = true,
+                binaryData = data
+            )
+            _incomingData.emit(bluetoothData)
+
+            Log.d(TAG, "Sent ${data.size} bytes")
+            true
+        } catch (e: IOException) {
+            Log.e(TAG, "Send bytes failed: ${e.message}")
+            false
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception sending bytes: ${e.message}")
+            false
+        }
+    }
+
+    private fun startReceiving() {
+        receiveJob?.cancel()
+        receiveJob = scope.launch {
+            val buffer = ByteArray(1024)
+            while (isActive && _connectionState.value == ConnectionState.CONNECTED) {
+                try {
+                    val bytesRead = inputStream?.read(buffer) ?: -1
+                    if (bytesRead > 0) {
+                        val data = String(buffer, 0, bytesRead, Charsets.UTF_8)
+                        val parsedData = parseReceivedData(data, buffer.copyOf(bytesRead))
+                        _incomingData.emit(parsedData)
+                        Log.d(TAG, "Received: $data")
+                    }
+                } catch (e: IOException) {
+                    Log.e(TAG, "Receive error: ${e.message}")
+                    if (_connectionState.value == ConnectionState.CONNECTED) {
+                        _connectionState.value = ConnectionState.DISCONNECTED
+                        closeSocket()
+                    }
+                    break
+                }
+                delay(10)
+            }
+        }
+    }
+
+    private fun parseReceivedData(textData: String, binaryData: ByteArray): BluetoothData {
+        val jsonData = tryParseJson(textData)
+
+        return BluetoothData(
+            type = DataType.INCOMING,
+            data = textData,
+            deviceAddress = currentDevice?.address ?: "",
+            timestamp = System.currentTimeMillis(),
+            isBinary = binaryData.isNotEmpty() && !textData.isBlank(),
+            binaryData = if (binaryData.isNotEmpty()) binaryData else null,
+            parsedJson = jsonData
+        )
+    }
+
+    private fun tryParseJson(text: String): Map<String, Any>? {
+        return try {
+            if (text.trim().startsWith("{") && text.trim().endsWith("}")) {
+                mapOf("raw" to text)
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun disconnect() {
+        receiveJob?.cancel()
+        receiveJob = null
+
+        closeSocket()
+        currentDevice = null
+        _connectionState.value = ConnectionState.DISCONNECTED
+        Log.d(TAG, "Disconnected")
+    }
+
+    private fun closeSocket() {
+        try {
+            inputStream?.close()
+            outputStream?.close()
+            bluetoothSocket?.close()
+        } catch (e: IOException) {
+            Log.e(TAG, "Error closing socket: ${e.message}")
+        } finally {
+            inputStream = null
+            outputStream = null
+            bluetoothSocket = null
+        }
+    }
+
+    fun cleanup() {
+        scope.cancel()
+        try {
+            context.unregisterReceiver(discoveryReceiver)
+        } catch (e: IllegalArgumentException) {
+            // Receiver not registered
+        }
+        disconnect()
+    }
+}
+
+enum class ConnectionState {
+    DISCONNECTED,
+    CONNECTING,
+    CONNECTED
+}
+
+enum class DataType {
+    INCOMING,
+    OUTGOING
+}
+
+data class BluetoothData(
+    val type: DataType,
+    val data: String,
+    val deviceAddress: String,
+    val timestamp: Long,
+    val isBinary: Boolean = false,
+    val binaryData: ByteArray? = null,
+    val parsedJson: Map<String, Any>? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as BluetoothData
+
+        if (type != other.type) return false
+        if (data != other.data) return false
+        if (deviceAddress != other.deviceAddress) return false
+        if (timestamp != other.timestamp) return false
+        if (isBinary != other.isBinary) return false
+        if (binaryData != null) {
+            if (other.binaryData == null) return false
+            if (!binaryData.contentEquals(other.binaryData)) return false
+        } else if (other.binaryData != null) return false
+        if (parsedJson != other.parsedJson) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = type.hashCode()
+        result = 31 * result + data.hashCode()
+        result = 31 * result + deviceAddress.hashCode()
+        result = 31 * result + timestamp.hashCode()
+        result = 31 * result + isBinary.hashCode()
+        result = 31 * result + (binaryData?.contentHashCode() ?: 0)
+        result = 31 * result + (parsedJson?.hashCode() ?: 0)
+        return result
+    }
+}

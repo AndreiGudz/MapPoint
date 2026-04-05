@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -15,6 +16,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.mappoint.ui.screens.bluetooth.BluetoothScreen
 import com.mappoint.ui.screens.input.InputScreen
 import com.mappoint.ui.screens.map.MapScreen
 import com.mappoint.ui.screens.map.MapViewModel
@@ -26,21 +28,16 @@ sealed class Screen(val route: String) {
     object Permissions : Screen("permissions")
     object Map : Screen("map")
     object Input : Screen("input")
+    object Bluetooth : Screen("bluetooth")
 }
 
 @Composable
 fun OfflineMapApp(
     navController: NavHostController = rememberNavController()
 ) {
-    // Проверяем, есть ли разрешение на местоположение
     val context = LocalContext.current
-    var hasPermission by remember { mutableStateOf(false) }
-
-    // Проверяем разрешения при старте
-    LaunchedEffect(Unit) {
-        hasPermission = hasLocationPermission(context)
-    }
-
+    // Проверяем, есть ли разрешение на местоположение
+    var hasPermission by rememberSaveable { mutableStateOf(hasLocationPermission(context)) }
     // Создаем общий ViewModel для карты
     val mapViewModel: MapViewModel = viewModel()
 
@@ -69,6 +66,9 @@ fun OfflineMapApp(
                     mapViewModel = mapViewModel,
                     onNavigateToInput = {
                         navController.navigate(Screen.Input.route)
+                    },
+                    onNavigateToBluetooth = {
+                        navController.navigate(Screen.Bluetooth.route)
                     }
                 )
             }
@@ -78,6 +78,18 @@ fun OfflineMapApp(
                 InputScreen(
                     mapViewModel = mapViewModel,
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            // Экран для взаимодействия с ESP32 по Bluetooth
+            composable(Screen.Bluetooth.route) {
+                BluetoothScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onGpsDataReceived = { latitude, longitude ->
+                        // Автоматически добавляем точку на карту при получении GPS данных
+                        mapViewModel.addMarker(latitude, longitude, "From ESP32")
+                        navController.popBackStack()
+                    }
                 )
             }
         }

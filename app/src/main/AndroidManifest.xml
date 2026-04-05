@@ -4,6 +4,10 @@
     <uses-feature
         android:name="android.hardware.location.gps"
         android:required="false" />
+    <!-- Bluetooth у телефона обязательно должен быть -->
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="true" />
 
     <!-- Разрешения для местоположения -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
