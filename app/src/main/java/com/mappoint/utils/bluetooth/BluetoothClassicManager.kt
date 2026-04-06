@@ -1,23 +1,37 @@
 package com.mappoint.utils.bluetooth
 
 import android.Manifest
-import android.bluetooth.*
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresPermission
-import androidx.core.content.ContextCompat
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.util.*
+import java.util.UUID
 
 class BluetoothClassicManager(private val context: Context) {
 
@@ -25,6 +39,8 @@ class BluetoothClassicManager(private val context: Context) {
         private const val TAG = "BluetoothManager"
         val MY_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     }
+
+    private var isReceiverRegistered = false
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -54,7 +70,7 @@ class BluetoothClassicManager(private val context: Context) {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 BluetoothDevice.ACTION_FOUND -> {
-                    if (checkBluetoothPermissions()) {
+                    if (hasBluetoothPermissions()) {
                         val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
                         } else {
@@ -74,20 +90,19 @@ class BluetoothClassicManager(private val context: Context) {
     }
 
     init {
-        if (checkBluetoothPermissions()) {
+        if (hasBluetoothPermissions()) {
             registerReceivers()
         } else {
-            Log.e(TAG, "Missing Bluetooth permissions")
+            Log.e(TAG, "Missing Bluetooth permissions, receiver not registered")
         }
     }
 
-    private fun checkBluetoothPermissions(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-        } else {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
+    private fun hasBluetoothPermissions(): Boolean = BluetoothPermissionHelper.hasPermissions(context)
+
+    private fun ensureReceiverRegistered() {
+        if (!isReceiverRegistered && BluetoothPermissionHelper.hasPermissions(context)) {
+            registerReceivers()
+            isReceiverRegistered = true
         }
     }
 
@@ -125,7 +140,8 @@ class BluetoothClassicManager(private val context: Context) {
     }
 
     fun startDiscovery() {
-        if (!checkBluetoothPermissions()) {
+        ensureReceiverRegistered()
+        if (!hasBluetoothPermissions()) {
             Log.e(TAG, "Missing permissions for discovery")
             return
         }
@@ -145,7 +161,7 @@ class BluetoothClassicManager(private val context: Context) {
     }
 
     fun stopDiscovery() {
-        if (!checkBluetoothPermissions()) return
+        if (!hasBluetoothPermissions()) return
         try {
             if (bluetoothAdapter?.isDiscovering == true) {
                 bluetoothAdapter?.cancelDiscovery()
@@ -156,7 +172,7 @@ class BluetoothClassicManager(private val context: Context) {
     }
 
     suspend fun connectToDevice(device: BluetoothDevice): Boolean = withContext(Dispatchers.IO) {
-        if (!checkBluetoothPermissions()) return@withContext false
+        if (!hasBluetoothPermissions()) return@withContext false
         try {
             disconnect()
             stopDiscovery()
@@ -195,7 +211,7 @@ class BluetoothClassicManager(private val context: Context) {
      * Отправка строки (JSON) на ESP32.
      */
     suspend fun sendJson(jsonString: String): Boolean = withContext(Dispatchers.IO) {
-        if (!checkBluetoothPermissions()) return@withContext false
+        if (!hasBluetoothPermissions()) return@withContext false
         return@withContext try {
             val bytes = jsonString.toByteArray(Charsets.UTF_8)
             outputStream?.write(bytes)

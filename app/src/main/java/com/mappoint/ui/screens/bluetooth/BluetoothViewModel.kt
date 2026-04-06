@@ -1,6 +1,5 @@
 package com.mappoint.ui.screens.bluetooth
 
-import android.Manifest
 import android.Manifest.permission.BLUETOOTH
 import android.Manifest.permission.BLUETOOTH_ADMIN
 import android.Manifest.permission.BLUETOOTH_CONNECT
@@ -15,9 +14,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mappoint.utils.bluetooth.BluetoothClassicManager
 import com.mappoint.utils.bluetooth.BluetoothData
+import com.mappoint.utils.bluetooth.BluetoothPermissionHelper
 import com.mappoint.utils.bluetooth.ConnectionState
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -34,6 +40,9 @@ data class BluetoothUiState(
 class BluetoothViewModel(application: Application) : AndroidViewModel(application) {
 
     private val bluetoothManager = BluetoothClassicManager(application)
+
+    private val _hasPermissions = MutableStateFlow(BluetoothPermissionHelper.hasPermissions(application))
+    val hasPermissions: StateFlow<Boolean> = _hasPermissions.asStateFlow()
 
     private val _uiState = MutableStateFlow(BluetoothUiState())
     val uiState: StateFlow<BluetoothUiState> = _uiState.asStateFlow()
@@ -72,15 +81,23 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun checkPermissions() {
-        val application = getApplication<Application>()
-        val hasPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(application, BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(application, BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-        } else {
-            ContextCompat.checkSelfPermission(application, BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(application, BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
+        val granted = BluetoothPermissionHelper.hasPermissions(getApplication())
+        _hasPermissions.value = granted
+        _uiState.update { it.copy(hasPermissions = granted) }
+    }
+
+    /**
+     * Вызывается экраном, когда пользователь предоставил или отклонил разрешения.
+     */
+    fun onPermissionsResult(granted: Boolean) {
+        _hasPermissions.value = granted
+        _uiState.update { it.copy(hasPermissions = granted) }
+        if (granted) {
+            // Разрешения получены – можно обновить состояние Bluetooth и т.д.
+            updateBluetoothState()
+            // Перерегистрируем receiver в менеджере (он сам проверит разрешения)
+            // Можно также пересоздать менеджер, но проще вызвать метод, который перепроверит.
         }
-        _uiState.update { it.copy(hasPermissions = hasPermissions) }
     }
 
     fun updateBluetoothState() {
