@@ -38,6 +38,10 @@ class BluetoothClassicManager(private val context: Context) {
     companion object {
         private const val TAG = "BluetoothManager"
         val MY_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+        fun getEnableBluetoothIntent(): Intent {
+            return Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+        }
     }
 
     private var isReceiverRegistered = false
@@ -133,10 +137,6 @@ class BluetoothClassicManager(private val context: Context) {
             Log.e(TAG, "Security exception checking Bluetooth state: ${e.message}")
             false
         }
-    }
-
-    fun getEnableBluetoothIntent(): Intent {
-        return Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
     }
 
     fun startDiscovery() {

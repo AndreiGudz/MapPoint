@@ -93,10 +93,7 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
         _hasPermissions.value = granted
         _uiState.update { it.copy(hasPermissions = granted) }
         if (granted) {
-            // Разрешения получены – можно обновить состояние Bluetooth и т.д.
             updateBluetoothState()
-            // Перерегистрируем receiver в менеджере (он сам проверит разрешения)
-            // Можно также пересоздать менеджер, но проще вызвать метод, который перепроверит.
         }
     }
 

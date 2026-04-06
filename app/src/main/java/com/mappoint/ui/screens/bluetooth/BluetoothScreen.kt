@@ -68,10 +68,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mappoint.utils.bluetooth.BluetoothClassicManager
 import com.mappoint.utils.bluetooth.BluetoothData
 import com.mappoint.utils.bluetooth.BluetoothPermissionHelper
 import com.mappoint.utils.bluetooth.ConnectionState
 import com.mappoint.utils.bluetooth.DataType
+import com.mappoint.utils.bluetooth.LocationHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -87,6 +89,7 @@ fun BluetoothScreen(
     val messages by bluetoothViewModel.messages.collectAsState()
     val context = LocalContext.current
     var inputText by remember { mutableStateOf("") }
+    var locationEnabled by remember {  mutableStateOf(LocationHelper.isLocationEnabled(context)) }
 
     LaunchedEffect(Unit) {
         bluetoothViewModel.onGpsDataReceived = onGpsDataReceived
@@ -108,6 +111,13 @@ fun BluetoothScreen(
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             bluetoothViewModel.updateBluetoothState()
         }
+    }
+
+    // Включение GPS
+    val enableLocationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        locationEnabled = LocationHelper.isLocationEnabled(context)
     }
 
     // Запрашиваем разрешения при старте, если их нет
@@ -212,11 +222,38 @@ fun BluetoothScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
                             onClick = {
-                                val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                                val enableIntent = BluetoothClassicManager.getEnableBluetoothIntent()
                                 enableBluetoothLauncher.launch(enableIntent)
                             }
                         ) {
                             Text("Включить Bluetooth")
+                        }
+                    }
+                }
+            }
+
+            // Проверка включен ли GPS на Android 10-11
+            val isOldAndroidVersion = Build.VERSION.SDK_INT <= Build.VERSION_CODES.R
+            if (uiState.hasPermissions && !locationEnabled && isOldAndroidVersion) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Для поиска Bluetooth требуется включить геолокацию")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = {
+                            val enableIntent = LocationHelper.getLocationSettingsIntent()
+                            enableLocationLauncher.launch(enableIntent)
+                        }) {
+                            Text("Включить геолокацию")
                         }
                     }
                 }
