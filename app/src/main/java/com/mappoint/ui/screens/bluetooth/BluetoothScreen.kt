@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -191,7 +192,7 @@ fun BluetoothScreen(
                         modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Требуются разрешения Bluetooth")
+                        Text("Требуются разрешения")
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
                             onClick = {
@@ -443,6 +444,15 @@ fun ChatTab(
     onSend: () -> Unit,
     onClear: () -> Unit
 ) {
+    val listState = rememberLazyListState()
+
+    // Автоматическая прокрутка к последнему сообщению при отправке/получении
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -470,7 +480,7 @@ fun ChatTab(
                 }
             }
 
-            items(messages.reversed()) { message ->
+            items(messages) { message ->
                 MessageBubble(message = message)
             }
         }
