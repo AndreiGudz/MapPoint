@@ -13,6 +13,7 @@ import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import org.json.JSONObject
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -36,6 +37,7 @@ class BluetoothClassicManager(private val context: Context) {
     private val _discoveredDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val discoveredDevices: StateFlow<List<BluetoothDevice>> = _discoveredDevices.asStateFlow()
 
+    // Теперь поток принимает только BluetoothData без бинарных полей
     private val _incomingData = MutableSharedFlow<BluetoothData>()
     val incomingData: SharedFlow<BluetoothData> = _incomingData.asSharedFlow()
 
@@ -48,7 +50,7 @@ class BluetoothClassicManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val discoveryReceiver = object : BroadcastReceiver() {
-        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT) // BLUETOOTH_CONNECT проверяется в checkBluetoothPermissions
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 BluetoothDevice.ACTION_FOUND -> {
@@ -127,17 +129,14 @@ class BluetoothClassicManager(private val context: Context) {
             Log.e(TAG, "Missing permissions for discovery")
             return
         }
-
         if (!isBluetoothEnabled()) {
             Log.e(TAG, "Bluetooth not enabled")
             return
         }
-
         try {
             if (bluetoothAdapter?.isDiscovering == true) {
                 bluetoothAdapter?.cancelDiscovery()
             }
-
             _discoveredDevices.value = emptyList()
             bluetoothAdapter?.startDiscovery()
         } catch (e: SecurityException) {
@@ -146,10 +145,7 @@ class BluetoothClassicManager(private val context: Context) {
     }
 
     fun stopDiscovery() {
-        if (!checkBluetoothPermissions()) {
-            return
-        }
-
+        if (!checkBluetoothPermissions()) return
         try {
             if (bluetoothAdapter?.isDiscovering == true) {
                 bluetoothAdapter?.cancelDiscovery()
@@ -160,15 +156,10 @@ class BluetoothClassicManager(private val context: Context) {
     }
 
     suspend fun connectToDevice(device: BluetoothDevice): Boolean = withContext(Dispatchers.IO) {
-        if (!checkBluetoothPermissions()) {
-            Log.e(TAG, "Missing permissions for connection")
-            return@withContext false
-        }
-
+        if (!checkBluetoothPermissions()) return@withContext false
         try {
             disconnect()
             stopDiscovery()
-
             currentDevice = device
             _connectionState.value = ConnectionState.CONNECTING
 
@@ -180,15 +171,12 @@ class BluetoothClassicManager(private val context: Context) {
             }
 
             bluetoothSocket?.connect()
-
             inputStream = bluetoothSocket?.inputStream
             outputStream = bluetoothSocket?.outputStream
 
             _connectionState.value = ConnectionState.CONNECTED
             Log.d(TAG, "Connected to ${device.name}")
-
             startReceiving()
-
             return@withContext true
         } catch (e: IOException) {
             Log.e(TAG, "Connection failed: ${e.message}")
@@ -203,25 +191,25 @@ class BluetoothClassicManager(private val context: Context) {
         }
     }
 
-    suspend fun sendData(data: String): Boolean = withContext(Dispatchers.IO) {
-        if (!checkBluetoothPermissions()) {
-            return@withContext false
-        }
-
+    /**
+     * Отправка строки (JSON) на ESP32.
+     */
+    suspend fun sendJson(jsonString: String): Boolean = withContext(Dispatchers.IO) {
+        if (!checkBluetoothPermissions()) return@withContext false
         return@withContext try {
-            val bytes = data.toByteArray(Charsets.UTF_8)
+            val bytes = jsonString.toByteArray(Charsets.UTF_8)
             outputStream?.write(bytes)
             outputStream?.flush()
 
             val bluetoothData = BluetoothData(
                 type = DataType.OUTGOING,
-                data = data,
+                data = jsonString,
                 deviceAddress = currentDevice?.address ?: "",
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
+                parsedJson = tryParseJson(jsonString)
             )
             _incomingData.emit(bluetoothData)
-
-            Log.d(TAG, "Sent: $data")
+            Log.d(TAG, "Sent JSON: $jsonString")
             true
         } catch (e: IOException) {
             Log.e(TAG, "Send failed: ${e.message}")
@@ -232,48 +220,18 @@ class BluetoothClassicManager(private val context: Context) {
         }
     }
 
-    suspend fun sendBytes(data: ByteArray): Boolean = withContext(Dispatchers.IO) {
-        if (!checkBluetoothPermissions()) {
-            return@withContext false
-        }
-
-        return@withContext try {
-            outputStream?.write(data)
-            outputStream?.flush()
-
-            val bluetoothData = BluetoothData(
-                type = DataType.OUTGOING,
-                data = data.joinToString(",") { it.toString() },
-                deviceAddress = currentDevice?.address ?: "",
-                timestamp = System.currentTimeMillis(),
-                isBinary = true,
-                binaryData = data
-            )
-            _incomingData.emit(bluetoothData)
-
-            Log.d(TAG, "Sent ${data.size} bytes")
-            true
-        } catch (e: IOException) {
-            Log.e(TAG, "Send bytes failed: ${e.message}")
-            false
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Security exception sending bytes: ${e.message}")
-            false
-        }
-    }
-
     private fun startReceiving() {
         receiveJob?.cancel()
         receiveJob = scope.launch {
-            val buffer = ByteArray(1024)
+            val buffer = ByteArray(4096) // чуть больше для JSON
             while (isActive && _connectionState.value == ConnectionState.CONNECTED) {
                 try {
                     val bytesRead = inputStream?.read(buffer) ?: -1
                     if (bytesRead > 0) {
-                        val data = String(buffer, 0, bytesRead, Charsets.UTF_8)
-                        val parsedData = parseReceivedData(data, buffer.copyOf(bytesRead))
-                        _incomingData.emit(parsedData)
-                        Log.d(TAG, "Received: $data")
+                        val rawData = String(buffer, 0, bytesRead, Charsets.UTF_8)
+                        val parsed = parseReceivedData(rawData)
+                        _incomingData.emit(parsed)
+                        Log.d(TAG, "Received: $rawData")
                     }
                 } catch (e: IOException) {
                     Log.e(TAG, "Receive error: ${e.message}")
@@ -288,26 +246,26 @@ class BluetoothClassicManager(private val context: Context) {
         }
     }
 
-    private fun parseReceivedData(textData: String, binaryData: ByteArray): BluetoothData {
-        val jsonData = tryParseJson(textData)
-
+    private fun parseReceivedData(rawData: String): BluetoothData {
+        val json = tryParseJson(rawData)
         return BluetoothData(
             type = DataType.INCOMING,
-            data = textData,
+            data = rawData,
             deviceAddress = currentDevice?.address ?: "",
             timestamp = System.currentTimeMillis(),
-            isBinary = binaryData.isNotEmpty() && !textData.isBlank(),
-            binaryData = if (binaryData.isNotEmpty()) binaryData else null,
-            parsedJson = jsonData
+            parsedJson = json
         )
     }
 
     private fun tryParseJson(text: String): Map<String, Any>? {
         return try {
-            if (text.trim().startsWith("{") && text.trim().endsWith("}")) {
-                mapOf("raw" to text)
-            } else null
+            val jsonObject = JSONObject(text)
+            // Преобразуем JSONObject в Map<String, Any>
+            jsonObject.keys().asSequence().associateWith { key ->
+                jsonObject.get(key)
+            }
         } catch (e: Exception) {
+            Log.d(TAG, "TryParseJson error: ${e.message}")
             null
         }
     }
@@ -315,7 +273,6 @@ class BluetoothClassicManager(private val context: Context) {
     fun disconnect() {
         receiveJob?.cancel()
         receiveJob = null
-
         closeSocket()
         currentDevice = null
         _connectionState.value = ConnectionState.DISCONNECTED
@@ -341,7 +298,7 @@ class BluetoothClassicManager(private val context: Context) {
         try {
             context.unregisterReceiver(discoveryReceiver)
         } catch (e: IllegalArgumentException) {
-            // Receiver not registered
+            Log.e(TAG, "Receiver not registered ${e.message}")
         }
         disconnect()
     }
@@ -363,8 +320,6 @@ data class BluetoothData(
     val data: String,
     val deviceAddress: String,
     val timestamp: Long,
-    val isBinary: Boolean = false,
-    val binaryData: ByteArray? = null,
     val parsedJson: Map<String, Any>? = null
 ) {
     override fun equals(other: Any?): Boolean {
@@ -377,11 +332,6 @@ data class BluetoothData(
         if (data != other.data) return false
         if (deviceAddress != other.deviceAddress) return false
         if (timestamp != other.timestamp) return false
-        if (isBinary != other.isBinary) return false
-        if (binaryData != null) {
-            if (other.binaryData == null) return false
-            if (!binaryData.contentEquals(other.binaryData)) return false
-        } else if (other.binaryData != null) return false
         if (parsedJson != other.parsedJson) return false
 
         return true
@@ -392,8 +342,6 @@ data class BluetoothData(
         result = 31 * result + data.hashCode()
         result = 31 * result + deviceAddress.hashCode()
         result = 31 * result + timestamp.hashCode()
-        result = 31 * result + isBinary.hashCode()
-        result = 31 * result + (binaryData?.contentHashCode() ?: 0)
         result = 31 * result + (parsedJson?.hashCode() ?: 0)
         return result
     }

@@ -1,10 +1,15 @@
 package com.mappoint.ui.screens.bluetooth
 
 import android.Manifest
+import android.Manifest.permission.BLUETOOTH
+import android.Manifest.permission.BLUETOOTH_ADMIN
+import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.BLUETOOTH_SCAN
 import android.app.Application
 import android.bluetooth.BluetoothDevice
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,6 +19,7 @@ import com.mappoint.utils.bluetooth.ConnectionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 data class BluetoothUiState(
     val connectionState: ConnectionState = ConnectionState.DISCONNECTED,
@@ -36,23 +42,24 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
     val messages: StateFlow<List<BluetoothData>> = _messages.asStateFlow()
 
     init {
+        // Отслеживание состояния подключения
         viewModelScope.launch {
             bluetoothManager.connectionState.collect { state ->
                 _uiState.update { it.copy(
                     connectionState = state,
-                    connectedDeviceName = if (state == ConnectionState.CONNECTED) {
-                        "ESP32"
-                    } else null
+                    connectedDeviceName = if (state == ConnectionState.CONNECTED) "ESP32" else null
                 ) }
             }
         }
 
+        // Отслеживание состояния поиска устройств
         viewModelScope.launch {
             bluetoothManager.discoveredDevices.collect { devices ->
                 _uiState.update { it.copy(discoveredDevices = devices) }
             }
         }
 
+        // Получение входящих данных
         viewModelScope.launch {
             bluetoothManager.incomingData.collect { data ->
                 addMessage(data)
@@ -65,12 +72,13 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun checkPermissions() {
+        val application = getApplication<Application>()
         val hasPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(application, BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(application, BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
         } else {
-            ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(application, BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(application, BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
         }
         _uiState.update { it.copy(hasPermissions = hasPermissions) }
     }
@@ -85,14 +93,10 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun startDiscovery() {
-        if (!_uiState.value.hasPermissions) {
-            return
-        }
-
+        if (!_uiState.value.hasPermissions) return
         if (bluetoothManager.isBluetoothEnabled()) {
             _uiState.update { it.copy(isScanning = true) }
             bluetoothManager.startDiscovery()
-
             viewModelScope.launch {
                 delay(10000) // Остановить поиск через 10 секунд
                 stopDiscovery()
@@ -106,10 +110,7 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun connectToDevice(device: BluetoothDevice) {
-        if (!_uiState.value.hasPermissions) {
-            return
-        }
-
+        if (!_uiState.value.hasPermissions) return
         viewModelScope.launch {
             bluetoothManager.connectToDevice(device)
             stopDiscovery()
@@ -122,52 +123,30 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun sendData(data: String) {
-        if (!_uiState.value.hasPermissions) {
-            return
-        }
-
+    /**
+     * Отправка произвольной JSON-строки.
+     */
+    fun sendJson(jsonString: String) {
+        if (!_uiState.value.hasPermissions) return
         viewModelScope.launch {
-            bluetoothManager.sendData(data)
+            bluetoothManager.sendJson(jsonString)
         }
     }
 
-    fun sendTestGpsData(latitude: Double, longitude: Double) {
-        if (!_uiState.value.hasPermissions) {
-            return
-        }
-
-        val latBytes = floatToBytes(latitude.toFloat())
-        val lngBytes = floatToBytes(longitude.toFloat())
-        val binaryData = latBytes + lngBytes
-
-        viewModelScope.launch {
-            bluetoothManager.sendBytes(binaryData)
-        }
-    }
-
-    fun sendTestJsonData(latitude: Double, longitude: Double, additionalData: Map<String, Any> = emptyMap()) {
-        if (!_uiState.value.hasPermissions) {
-            return
-        }
-
-        val jsonString = buildString {
-            append("{")
-            append("\"type\":\"gps_data\",")
-            append("\"latitude\":$latitude,")
-            append("\"longitude\":$longitude,")
-            append("\"timestamp\":${System.currentTimeMillis()}")
-            if (additionalData.isNotEmpty()) {
-                additionalData.forEach { (key, value) ->
-                    append(",\"$key\":\"$value\"")
-                }
+    /**
+     * Удобный метод для отправки GPS-координат в формате JSON.
+     */
+    fun sendGpsData(latitude: Double, longitude: Double, additionalData: Map<String, Any> = emptyMap()) {
+        val jsonObject = JSONObject().apply {
+            put("type", "gps_data")
+            put("latitude", latitude)
+            put("longitude", longitude)
+            put("timestamp", System.currentTimeMillis())
+            additionalData.forEach { (key, value) ->
+                put(key, value)
             }
-            append("}")
         }
-
-        viewModelScope.launch {
-            bluetoothManager.sendData(jsonString)
-        }
+        sendJson(jsonObject.toString())
     }
 
     private fun addMessage(data: BluetoothData) {
@@ -179,16 +158,20 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun handleIncomingData(data: BluetoothData) {
-        if (data.isBinary && data.binaryData != null && data.binaryData.size >= 8) {
-            val latitude = bytesToFloat(data.binaryData.sliceArray(0..3))
-            val longitude = bytesToFloat(data.binaryData.sliceArray(4..7))
-            handleGpsData(latitude.toDouble(), longitude.toDouble())
-        }
-
-        if (data.parsedJson != null && data.parsedJson["type"] == "gps_data") {
-            val latitude = (data.parsedJson["latitude"] as? Double) ?: return
-            val longitude = (data.parsedJson["longitude"] as? Double) ?: return
-            handleGpsData(latitude, longitude)
+        // Обрабатываем только JSON-данные
+        val json = data.parsedJson ?: return
+        when (json["type"]) {
+            "gps_data" -> {
+                val lat = (json["latitude"] as? Number)?.toDouble()
+                val lng = (json["longitude"] as? Number)?.toDouble()
+                if (lat != null && lng != null) {
+                    handleGpsData(lat, lng)
+                }
+            }
+            // Можно добавить другие типы сообщений от ESP32
+            else -> {
+                Log.d("BluetoothVM", "Unknown message type: ${json["type"]}")
+            }
         }
     }
 
@@ -197,23 +180,6 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     var onGpsDataReceived: ((Double, Double) -> Unit)? = null
-
-    private fun floatToBytes(value: Float): ByteArray {
-        return byteArrayOf(
-            (value.toBits() shr 24).toByte(),
-            (value.toBits() shr 16).toByte(),
-            (value.toBits() shr 8).toByte(),
-            value.toBits().toByte()
-        )
-    }
-
-    private fun bytesToFloat(bytes: ByteArray): Float {
-        val intBits = ((bytes[0].toInt() and 0xFF) shl 24) or
-                ((bytes[1].toInt() and 0xFF) shl 16) or
-                ((bytes[2].toInt() and 0xFF) shl 8) or
-                (bytes[3].toInt() and 0xFF)
-        return Float.fromBits(intBits)
-    }
 
     fun clearMessages() {
         _messages.value = emptyList()

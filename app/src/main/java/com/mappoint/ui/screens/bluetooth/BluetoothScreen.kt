@@ -1,7 +1,10 @@
 package com.mappoint.ui.screens.bluetooth
 
 import android.Manifest
+import android.Manifest.permission.BLUETOOTH
+import android.Manifest.permission.BLUETOOTH_ADMIN
 import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.BLUETOOTH_SCAN
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -18,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,11 +56,11 @@ fun BluetoothScreen(
     // Проверка наличия разрешений
     fun hasBluetoothPermissions(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(context, BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
         } else {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(context, BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
         }
     }
 
@@ -64,11 +68,9 @@ fun BluetoothScreen(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val allGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissions[Manifest.permission.BLUETOOTH_CONNECT] == true &&
-                    permissions[Manifest.permission.BLUETOOTH_SCAN] == true
+            permissions[BLUETOOTH_CONNECT] == true && permissions[BLUETOOTH_SCAN] == true
         } else {
-            permissions[Manifest.permission.BLUETOOTH] == true &&
-                    permissions[Manifest.permission.BLUETOOTH_ADMIN] == true
+            permissions[BLUETOOTH] == true && permissions[BLUETOOTH_ADMIN] == true
         }
 
         if (allGranted) {
@@ -88,15 +90,9 @@ fun BluetoothScreen(
     LaunchedEffect(Unit) {
         if (!hasBluetoothPermissions()) {
             val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_CONNECT,
-                    Manifest.permission.BLUETOOTH_SCAN
-                )
+                arrayOf(BLUETOOTH_CONNECT, BLUETOOTH_SCAN)
             } else {
-                arrayOf(
-                    Manifest.permission.BLUETOOTH,
-                    Manifest.permission.BLUETOOTH_ADMIN
-                )
+                arrayOf(BLUETOOTH, BLUETOOTH_ADMIN)
             }
             permissionLauncher.launch(permissionsToRequest)
         }
@@ -171,15 +167,9 @@ fun BluetoothScreen(
                         Button(
                             onClick = {
                                 val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                    arrayOf(
-                                        Manifest.permission.BLUETOOTH_CONNECT,
-                                        Manifest.permission.BLUETOOTH_SCAN
-                                    )
+                                    arrayOf(BLUETOOTH_CONNECT, BLUETOOTH_SCAN)
                                 } else {
-                                    arrayOf(
-                                        Manifest.permission.BLUETOOTH,
-                                        Manifest.permission.BLUETOOTH_ADMIN
-                                    )
+                                    arrayOf(BLUETOOTH, BLUETOOTH_ADMIN)
                                 }
                                 permissionLauncher.launch(permissionsToRequest)
                             }
@@ -255,18 +245,15 @@ fun BluetoothScreen(
                         onInputChange = { inputText = it },
                         onSend = {
                             if (inputText.isNotBlank()) {
-                                bluetoothViewModel.sendData(inputText)
+                                bluetoothViewModel.sendJson(inputText)
                                 inputText = ""
                             }
                         },
                         onClear = { bluetoothViewModel.clearMessages() }
                     )
                     2 -> TestTab(
-                        onSendTestGps = { lat, lng ->
-                            bluetoothViewModel.sendTestGpsData(lat, lng)
-                        },
-                        onSendTestJson = { lat, lng ->
-                            bluetoothViewModel.sendTestJsonData(lat, lng)
+                        onSendGpsData = { lat, lng ->
+                            bluetoothViewModel.sendGpsData(lat, lng)
                         }
                     )
                 }
@@ -275,7 +262,6 @@ fun BluetoothScreen(
     }
 }
 
-// Остальные composable функции остаются без изменений...
 @Composable
 @RequiresPermission(BLUETOOTH_CONNECT)
 fun DevicesTab(
@@ -447,7 +433,7 @@ fun ChatTab(
             )
 
             IconButton(onClick = onSend) {
-                Icon(Icons.Default.Send, contentDescription = "Отправить")
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить")
             }
 
             IconButton(onClick = onClear) {
@@ -478,21 +464,10 @@ fun MessageBubble(message: BluetoothData) {
             Column(
                 modifier = Modifier.padding(12.dp)
             ) {
-                if (message.isBinary) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Бинарные данные (${message.binaryData?.size ?: 0} байт)",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                } else {
-                    Text(
-                        text = message.data,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                Text(
+                    text = message.data,
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 Text(
                     text = dateFormat.format(Date(message.timestamp)),
                     style = MaterialTheme.typography.labelSmall,
@@ -505,8 +480,7 @@ fun MessageBubble(message: BluetoothData) {
 
 @Composable
 fun TestTab(
-    onSendTestGps: (Double, Double) -> Unit,
-    onSendTestJson: (Double, Double) -> Unit
+    onSendGpsData: (Double, Double) -> Unit
 ) {
     var testLat by remember { mutableStateOf("55.7558") }
     var testLng by remember { mutableStateOf("37.6173") }
@@ -529,7 +503,7 @@ fun TestTab(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Тестовые GPS координаты")
+                Text("Отправить GPS координаты (JSON)")
 
                 OutlinedTextField(
                     value = testLat,
@@ -545,31 +519,15 @@ fun TestTab(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Button(
+                    onClick = {
+                        val lat = testLat.toDoubleOrNull() ?: 55.7558
+                        val lng = testLng.toDoubleOrNull() ?: 37.6173
+                        onSendGpsData(lat, lng)
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Button(
-                        onClick = {
-                            val lat = testLat.toDoubleOrNull() ?: 55.7558
-                            val lng = testLng.toDoubleOrNull() ?: 37.6173
-                            onSendTestGps(lat, lng)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Бинарный формат")
-                    }
-
-                    Button(
-                        onClick = {
-                            val lat = testLat.toDoubleOrNull() ?: 55.7558
-                            val lng = testLng.toDoubleOrNull() ?: 37.6173
-                            onSendTestJson(lat, lng)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("JSON формат")
-                    }
+                    Text("Отправить JSON")
                 }
             }
         }
@@ -582,12 +540,11 @@ fun TestTab(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Форматы данных:",
+                    text = "Формат JSON:",
                     style = MaterialTheme.typography.titleSmall
                 )
                 Text(
-                    text = "• Бинарный: 8 байт (float широта + float долгота)\n" +
-                            "• JSON: {\"type\":\"gps_data\",\"latitude\":55.7558,\"longitude\":37.6173,\"timestamp\":1234567890}",
+                    text = "{\"type\":\"gps_data\",\"latitude\":55.7558,\"longitude\":37.6173,\"timestamp\":1234567890}",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
