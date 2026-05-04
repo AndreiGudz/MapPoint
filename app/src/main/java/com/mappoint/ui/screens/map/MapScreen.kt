@@ -13,9 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocation
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,83 +34,18 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.overlay.Marker
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.DeleteSweep
-
-// Для верхней панели и кнопок поверх карты
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MapScaffold(
-    onMenuClick: () -> Unit,
-    onCurrentLocationClick: () -> Unit,
-    selectedMarker: MapPoint?,
-    onDeleteSelectedMarker: () -> Unit,
-    onNavigateToInput: () -> Unit,
-    onNavigateToBluetooth: () -> Unit,
-    onCenterOnSelectedMarker: () -> Unit,
-    content: @Composable (PaddingValues) -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Карта") },
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = "Меню маркеров")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onCurrentLocationClick) {
-                        Icon(Icons.Default.MyLocation, contentDescription = "Мое местоположение")
-                    }
-                    IconButton(onClick = onNavigateToBluetooth) {
-                        Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth")
-                    }
-                    if (selectedMarker != null) {
-                        IconButton(onClick = onDeleteSelectedMarker) {
-                            Icon(Icons.Default.Delete, contentDescription = "Удалить точку")
-                        }
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            Column {
-                FloatingActionButton(
-                    onClick = onNavigateToInput,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Icon(Icons.Default.AddLocation, contentDescription = "Добавить точку")
-                }
-                if (selectedMarker != null) {
-                    FloatingActionButton(
-                        onClick = onCenterOnSelectedMarker,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        Icon(Icons.Default.Navigation, contentDescription = "Центрировать на точке")
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        content(innerPadding)
-    }
-}
-
-private const val DEFAULT_ZOOM_ON_MARKER = 15.0
 
 @SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     mapViewModel: MapViewModel = viewModel(),
-    onNavigateToInput: () -> Unit = {},
     onNavigateToBluetooth: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    var drawerMode by remember { mutableStateOf(DrawerMode.MANAGE) }
 
     // Состояния из ViewModel
     val center by mapViewModel.center.collectAsStateWithLifecycle()
@@ -119,7 +55,7 @@ fun MapScreen(
     val selectedMarker by mapViewModel.selectedMarker.collectAsStateWithLifecycle()
     val isLoading by mapViewModel.isLoading.collectAsStateWithLifecycle()
 
-    // Преобразование точек в формат для карты (кешируем, чтобы не пересоздавать при каждой рекомпозиции)
+    // Преобразование точек в формат для карты
     val markerDataList by remember(markers) {
         derivedStateOf {
             markers.map { point ->
@@ -132,26 +68,18 @@ fun MapScreen(
         }
     }
 
-    // Вспомогательная функция для закрытия drawer
+    // Функция открытия Drawer в нужном режиме
+    val openDrawer: (DrawerMode) -> Unit = { mode ->
+        drawerMode = mode
+        coroutineScope.launch { drawerState.open() }
+    }
+
+    // Функция закрытия Drawer
     val closeDrawer: () -> Unit = {
         coroutineScope.launch { drawerState.close() }
     }
 
-    // Обработчики действий с маркерами
-    val onCenterOnMarker: (MapPoint) -> Unit = { marker: MapPoint ->
-        mapViewModel.centerOnMarker(marker, DEFAULT_ZOOM_ON_MARKER)
-        closeDrawer()
-    }
-
-    val onDeleteMarker: (MapPoint) -> Unit = { marker: MapPoint ->
-        mapViewModel.removeMarker(marker)
-    }
-
-    val onDeleteAllMarkers: () -> Unit = {
-        mapViewModel.clearAllMarkers()
-        closeDrawer()
-    }
-
+    // Обработчик центрирования на текущем местоположении
     val onCurrentPosition: () -> Unit = {
         when {
             !hasLocationPermission(context) -> Toast.makeText(
@@ -168,42 +96,89 @@ fun MapScreen(
         }
     }
 
-    MapDeleteDrawer(
-        markers = markers,
-        selectedMarker = selectedMarker,
+    // Обработчик удаления выбранного маркера
+    val onDeleteSelectedMarker: () -> Unit = {
+        selectedMarker?.let { mapViewModel.removeMarker(it) }
+    }
+
+    // Обработчик центрирования на выбранном маркере
+    val onCenterOnSelectedMarker: () -> Unit = {
+        selectedMarker?.let { mapViewModel.centerOnMarker(it, 15.0) }
+    }
+
+    MapDrawer(
         drawerState = drawerState,
-        onMarkerClick = onCenterOnMarker,
-        onDeleteMarker = onDeleteMarker,
-        onDeleteAllMarkers = onDeleteAllMarkers,
-        onCenterOnMarker = onCenterOnMarker,
+        mode = drawerMode,
+        viewModel = mapViewModel,
         onCloseDrawer = closeDrawer
     ) {
-        MapScaffold(
-            onMenuClick = { coroutineScope.launch { drawerState.open() } },
-            onCurrentLocationClick = onCurrentPosition,
-            selectedMarker = selectedMarker,
-            onDeleteSelectedMarker = { selectedMarker?.let(onDeleteMarker) },
-            onNavigateToInput = onNavigateToInput,
-            onNavigateToBluetooth = onNavigateToBluetooth,
-            onCenterOnSelectedMarker = { selectedMarker?.let(onCenterOnMarker) },
-            { innerPadding ->
-                MapContent(
-                    modifier = Modifier.padding(innerPadding),
-                    center = center,
-                    zoomLevel = zoomLevel,
-                    frame = frame,
-                    markers = markerDataList,
-                    markerClickListener = mapViewModel.getMarkerClickListener(),
-                    isLoading = isLoading,
-                    selectedMarker = selectedMarker,
-                    context = context
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Карта") },
+                    navigationIcon = {
+                        IconButton(onClick = { openDrawer(DrawerMode.MANAGE) }) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Меню маркеров")
+                        }
+                    },
+                    actions = {
+                        // Кнопка центрирования на текущем местоположении
+                        IconButton(onClick = onCurrentPosition) {
+                            Icon(Icons.Default.MyLocation, contentDescription = "Моё местоположение")
+                        }
+
+                        // Кнопка перехода в Bluetooth экран
+                        IconButton(onClick = onNavigateToBluetooth) {
+                            Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth")
+                        }
+
+                        // Кнопка удаления выбранного маркера (только если выбран)
+                        if (selectedMarker != null) {
+                            IconButton(onClick = onDeleteSelectedMarker) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить выбранную точку")
+                            }
+                        }
+                    }
                 )
-            })
+            },
+            floatingActionButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    // Кнопка добавления новой точки
+                    FloatingActionButton(
+                        onClick = { openDrawer(DrawerMode.ADD) },
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Icon(Icons.Default.AddLocation, contentDescription = "Добавить точку")
+                    }
+
+                    // Кнопка центрирования на выбранной точке (только если выбран маркер)
+                    if (selectedMarker != null) {
+                        FloatingActionButton(
+                            onClick = onCenterOnSelectedMarker,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Icon(Icons.Default.MyLocation, contentDescription = "Центрировать на точке")
+                        }
+                    }
+                }
+            }
+        ) { innerPadding ->
+            MapContent(
+                modifier = Modifier.padding(innerPadding),
+                center = center,
+                zoomLevel = zoomLevel,
+                frame = frame,
+                markers = markerDataList,
+                markerClickListener = mapViewModel.getMarkerClickListener(),
+                isLoading = isLoading,
+                selectedMarker = selectedMarker,
+                context = context
+            )
+        }
     }
 }
 
 @Composable
-// Для карты
 private fun MapContent(
     modifier: Modifier = Modifier,
     center: GeoPoint,
@@ -216,6 +191,7 @@ private fun MapContent(
     context: Context
 ) {
     Box(modifier = modifier.fillMaxSize()) {
+        // Карта
         OsmMapView(
             modifier = Modifier.fillMaxSize(),
             center = center,
@@ -225,43 +201,74 @@ private fun MapContent(
             markerClickListener = markerClickListener,
         )
 
+        // Индикатор загрузки
         if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center)
+            )
         }
 
+        // Информация о выбранном маркере
         selectedMarker?.let { marker ->
-            SelectedMarkerInfo(marker = marker, modifier = Modifier.align(Alignment.TopStart))
+            SelectedMarkerInfo(
+                marker = marker,
+                modifier = Modifier.align(Alignment.TopStart)
+            )
         }
 
-        MapAttribution(modifier = Modifier.align(Alignment.BottomStart), context = context)
+        // Атрибуция OpenStreetMap
+        MapAttribution(
+            modifier = Modifier.align(Alignment.BottomStart),
+            context = context
+        )
     }
 }
 
-// Вывод информации о маркере
+@SuppressLint("DefaultLocale")
 @Composable
-private fun SelectedMarkerInfo(marker: MapPoint, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(16.dp)) {
+private fun SelectedMarkerInfo(
+    marker: MapPoint,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .padding(16.dp)
+            .background(
+                color = Color.White.copy(alpha = 0.9f),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(12.dp)
+    ) {
         Text(
             text = marker.title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleSmall,
             color = Color.Black
         )
         Text(
-            text = "Широта: ${"%.6f".format(marker.latitude)}",
+            text = "Широта: ${String.format("%.6f", marker.latitude)}",
             style = MaterialTheme.typography.bodySmall,
             color = Color.Black
         )
         Text(
-            text = "Долгота: ${"%.6f".format(marker.longitude)}",
+            text = "Долгота: ${String.format("%.6f", marker.longitude)}",
             style = MaterialTheme.typography.bodySmall,
             color = Color.Black
         )
+        if (marker.description.isNotBlank()) {
+            Text(
+                text = marker.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.DarkGray
+            )
+        }
     }
 }
 
-// Указание аттрибуции OpenStreetMap
 @Composable
-private fun MapAttribution(modifier: Modifier = Modifier, context: Context) {
+private fun MapAttribution(
+    modifier: Modifier = Modifier,
+    context: Context
+) {
     Text(
         text = "© OpenStreetMap contributors",
         modifier = modifier

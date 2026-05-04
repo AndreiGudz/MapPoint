@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -26,6 +27,16 @@ data class MapPoint(
     val longitude: Double,
     val title: String = "",
     val description: String = ""
+)
+
+// Класс для панели ввода
+data class InputFormState(
+    val latitude: String = "",
+    val longitude: String = "",
+    val title: String = "",
+    val description: String = "",
+    val isLatitudeValid: Boolean = true,
+    val isLongitudeValid: Boolean = true
 )
 
 const val minZoomLevel = 2.0
@@ -65,8 +76,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // Состояние поля ввода
+    private val _formState = MutableStateFlow(InputFormState())
+    val formState: StateFlow<InputFormState> = _formState.asStateFlow()
+
     init {
-//        Log.d("MapViewModel", "init")
         // Запускаем подписку на обновления местоположения при создании ViewModel
         viewModelScope.launch {
             locationProvider.getLocationFlow().collect { location ->
@@ -178,5 +192,52 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             _selectedMarker.value = findMarker(marker.position.latitude, marker.position.longitude)
             true
         }
+    }
+
+    fun updateFormLatitude(value: String) {
+        val isValid = if (value.isBlank()) {
+            true
+        } else {
+            value.toDoubleOrNull()?.let { it in -90.0..90.0 } ?: false
+        }
+        _formState.update { it.copy(latitude = value, isLatitudeValid = isValid) }
+    }
+
+    fun updateFormLongitude(value: String) {
+        val isValid = if (value.isBlank()) {
+            true
+        } else {
+            value.toDoubleOrNull()?.let { it in -180.0..180.0 } ?: false
+        }
+        _formState.update { it.copy(longitude = value, isLongitudeValid = isValid) }
+    }
+
+    fun updateFormTitle(value: String) {
+        _formState.update { it.copy(title = value) }
+    }
+
+    fun updateFormDescription(value: String) {
+        _formState.update { it.copy(description = value) }
+    }
+
+    fun addPointFromForm(): Boolean {
+        val lat = _formState.value.latitude.toDoubleOrNull()
+        val lng = _formState.value.longitude.toDoubleOrNull()
+
+        if (lat == null || lng == null) return false
+
+        val title = if (_formState.value.title.isBlank()) {
+            "Точка ${_markers.value.size + 1}"
+        } else {
+            _formState.value.title
+        }
+
+        addMarker(lat, lng, title)
+        clearForm()
+        return true
+    }
+
+    fun clearForm() {
+        _formState.value = InputFormState()
     }
 }

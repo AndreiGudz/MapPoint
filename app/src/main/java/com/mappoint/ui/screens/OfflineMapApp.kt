@@ -17,7 +17,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.mappoint.ui.screens.bluetooth.BluetoothScreen
-import com.mappoint.ui.screens.input.InputScreen
 import com.mappoint.ui.screens.map.MapScreen
 import com.mappoint.ui.screens.map.MapViewModel
 import com.mappoint.ui.screens.permission.PermissionScreen
@@ -27,7 +26,6 @@ import com.mappoint.utils.hasLocationPermission
 sealed class Screen(val route: String) {
     object Permissions : Screen("permissions")
     object Map : Screen("map")
-    object Input : Screen("input")
     object Bluetooth : Screen("bluetooth")
 }
 
@@ -64,20 +62,9 @@ fun OfflineMapApp(
             composable(Screen.Map.route) {
                 MapScreen(
                     mapViewModel = mapViewModel,
-                    onNavigateToInput = {
-                        navController.navigate(Screen.Input.route)
-                    },
                     onNavigateToBluetooth = {
                         navController.navigate(Screen.Bluetooth.route)
                     }
-                )
-            }
-
-            // Экран ввода координат
-            composable(Screen.Input.route) {
-                InputScreen(
-                    mapViewModel = mapViewModel,
-                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 
