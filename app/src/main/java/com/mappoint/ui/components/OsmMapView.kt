@@ -37,10 +37,6 @@ fun OsmMapView(
 
     // Проверяем, уничтожается ли активность
     val mapView = remember {
-        Configuration.getInstance().load(
-            context,
-            context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
-        )
         MapView(context).apply {
             // Настройка карты
             setTileSource(TileSourceFactory.MAPNIK)
@@ -160,3 +156,5 @@ data class MarkerData(
     val title: String = "",
     val iconResId: Int? = null
 )
+
+fun MarkerData.getKey(): String = "$latitude:$longitude:${title.hashCode()}"

@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.play.services.location)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -69,9 +70,6 @@ dependencies {
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.9.7")
-
-    // ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
 
     // OSMdroid - Основная библиотека карт
     implementation("org.osmdroid:osmdroid-android:6.1.20")
