@@ -22,7 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -113,28 +115,41 @@ fun MapScreen(
         onCloseDrawer = closeDrawer
     ) {
         Scaffold(
+            modifier = Modifier.testTag("MapScreen"),
             topBar = {
                 TopAppBar(
                     title = { Text("Карта") },
                     navigationIcon = {
-                        IconButton(onClick = { openDrawer(DrawerMode.MANAGE) }) {
+                        IconButton(
+                            onClick = { openDrawer(DrawerMode.MANAGE) },
+                            modifier = Modifier.testTag("OpenManageDrawerButton")
+                        ) {
                             Icon(Icons.Default.DeleteSweep, contentDescription = "Меню маркеров")
                         }
                     },
                     actions = {
                         // Кнопка центрирования на текущем местоположении
-                        IconButton(onClick = onCurrentPosition) {
+                        IconButton(
+                            onClick = onCurrentPosition,
+                            modifier = Modifier
+                        ) {
                             Icon(Icons.Default.MyLocation, contentDescription = "Моё местоположение")
                         }
 
                         // Кнопка перехода в Bluetooth экран
-                        IconButton(onClick = onNavigateToBluetooth) {
+                        IconButton(
+                            onClick = onNavigateToBluetooth,
+                            modifier = Modifier
+                        ) {
                             Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth")
                         }
 
                         // Кнопка удаления выбранного маркера (только если выбран)
                         if (selectedMarker != null) {
-                            IconButton(onClick = onDeleteSelectedMarker) {
+                            IconButton(
+                                onClick = onDeleteSelectedMarker,
+                                modifier = Modifier.testTag("DeletePointButton")
+                            ) {
                                 Icon(Icons.Default.Delete, contentDescription = "Удалить выбранную точку")
                             }
                         }
@@ -146,7 +161,9 @@ fun MapScreen(
                     // Кнопка добавления новой точки
                     FloatingActionButton(
                         onClick = { openDrawer(DrawerMode.ADD) },
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier
+                            .padding(bottom = 8.dp)
+                            .testTag("OpenAddPointButton")
                     ) {
                         Icon(Icons.Default.AddLocation, contentDescription = "Добавить точку")
                     }
@@ -155,7 +172,9 @@ fun MapScreen(
                     if (selectedMarker != null) {
                         FloatingActionButton(
                             onClick = onCenterOnSelectedMarker,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier
+                                .padding(bottom = 8.dp)
+                                .testTag("CenterLocationButton")
                         ) {
                             Icon(Icons.Default.MyLocation, contentDescription = "Центрировать на точке")
                         }

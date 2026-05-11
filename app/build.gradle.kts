@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.play.services.location)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.rules)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -73,26 +74,9 @@ dependencies {
 
     // OSMdroid - Основная библиотека карт
     implementation("org.osmdroid:osmdroid-android:6.1.20")
-
-    // Для определения текущей локации
-    // заменяется на реализацию от osmdroid : GpsMyLocationProvider
-//    implementation(libs.play.services.location)
-//    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
-
-
-
-/*    // Кеширование тайлов
-    implementation("org.osmdroid:osmdroid-geopackage:6.1.20") {
-        exclude(group = "com.j256.ormlite", module = "ormlite-core")
-        exclude(group = "com.j256.ormlite", module = "ormlite-android")
-    }
-
-    // Room для базы данных (история точек)
+/*    // Room для базы данных (история точек)
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
-
-    // Bluetooth
-    implementation("no.nordicsemi.android:ble:2.11.0")
-    implementation("no.nordicsemi.android:ble-ktx:2.11.0")*/
+    */
 }

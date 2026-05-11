@@ -7,6 +7,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 enum class DrawerMode {
@@ -27,7 +28,9 @@ fun MapDrawer(
         gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.width(360.dp)
+                modifier = Modifier
+                    .width(360.dp)
+                    .testTag("DrawerPanel")
             ) {
                 when (mode) {
                     DrawerMode.MANAGE -> ManageDrawerContent(viewModel, onCloseDrawer)

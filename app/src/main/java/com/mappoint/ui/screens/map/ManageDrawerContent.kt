@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,7 +65,10 @@ fun ManageDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            IconButton(onClick = onClose) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.testTag("Back")
+            ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Закрыть меню")
             }
         }
@@ -143,6 +147,7 @@ private fun MarkerMenuItem(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
                 else Color.Transparent
             )
+            .testTag("PointItem_${marker.title}")
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -176,7 +181,12 @@ private fun MarkerMenuItem(
             }
 
             Row {
-                IconButton(onClick = onCenter, modifier = Modifier.size(36.dp)) {
+                IconButton(
+                    onClick = onCenter,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("CenterPointItem_${marker.title}")
+                ) {
                     Icon(
                         Icons.Default.LocationOn,
                         contentDescription = "Центрировать",
@@ -186,7 +196,12 @@ private fun MarkerMenuItem(
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("DeletePointItem_${marker.title}")
+                ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Удалить",

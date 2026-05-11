@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -109,7 +110,7 @@ fun OsmMapView(
 
     // Вставляем MapView в Compose
     AndroidView(
-        modifier = modifier,
+        modifier = modifier.testTag("OsmMapView"),
         factory = { mapView }
     )
 }

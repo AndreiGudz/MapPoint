@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         // By default 600 Mb
         Configuration.getInstance().tileFileSystemCacheMaxBytes = 1024 * 1024 * 1000 // 1000 MB
         // By default 500 Mb
-        Configuration.getInstance().tileFileSystemCacheTrimBytes = 1024 * 1024 * 100  // 100 MB
+        Configuration.getInstance().tileFileSystemCacheTrimBytes = 1024 * 1024 * 900  // 900 MB
         Configuration.getInstance().tileDownloadMaxQueueSize = 1000
         // Просят не использовать более 2х потоков загрузки тайлов
         Configuration.getInstance().tileDownloadThreads = 2

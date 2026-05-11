@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -39,13 +40,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun AddDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
     val formState by viewModel.formState.collectAsStateWithLifecycle()
-    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(16.dp)
+            .testTag("AddPointPanel"),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Заголовок с кнопкой закрытия
@@ -60,7 +61,10 @@ fun AddDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            IconButton(onClick = onClose) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.testTag("Back")
+            ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Закрыть")
             }
         }
@@ -100,7 +104,9 @@ fun AddDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
                 onValueChange = { viewModel.updateFormLatitude(it) },
                 label = { Text("Широта") },
                 placeholder = { Text("55.7558") },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("LatitudeField"),
                 isError = !formState.isLatitudeValid && formState.latitude.isNotBlank(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
@@ -125,7 +131,9 @@ fun AddDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
                 onValueChange = { viewModel.updateFormLongitude(it) },
                 label = { Text("Долгота") },
                 placeholder = { Text("37.6173") },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("LongitudeField"),
                 isError = !formState.isLongitudeValid && formState.longitude.isNotBlank(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
@@ -152,7 +160,9 @@ fun AddDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
             onValueChange = { viewModel.updateFormTitle(it) },
             label = { Text("Название точки") },
             placeholder = { Text("Москва, Красная площадь") },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("TitleField"),
             singleLine = true
         )
 
@@ -162,7 +172,9 @@ fun AddDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
             onValueChange = { viewModel.updateFormDescription(it) },
             label = { Text("Описание") },
             placeholder = { Text("Дополнительная информация") },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("DescriptionField"),
             singleLine = true
         )
 
@@ -175,7 +187,9 @@ fun AddDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
         ) {
             Button(
                 onClick = { viewModel.clearForm() },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("ClearFormButton"),
                 enabled = formState.latitude.isNotBlank() ||
                         formState.longitude.isNotBlank() ||
                         formState.title.isNotBlank() ||
@@ -188,14 +202,12 @@ fun AddDrawerContent(viewModel: MapViewModel, onClose: () -> Unit) {
                 onClick = {
                     val added = viewModel.addPointFromForm()
                     if (added) {
-                        coroutineScope.launch {
-                            // Небольшая задержка перед закрытием для визуального фидбека
-                            kotlinx.coroutines.delay(200)
-                            onClose()
-                        }
+                        onClose()
                     }
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("SavePointButton"),
                 enabled = formState.latitude.isNotBlank() &&
                         formState.longitude.isNotBlank() &&
                         formState.isLatitudeValid &&
