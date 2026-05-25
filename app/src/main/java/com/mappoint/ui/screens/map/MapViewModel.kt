@@ -1,23 +1,18 @@
 package com.mappoint.ui.screens.map
 
 import android.app.Application
-import android.location.Location
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mappoint.data.AppDatabase
 import com.mappoint.data.PointEntity
 import com.mappoint.data.PointRepository
 import com.mappoint.utils.LocationProvider
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -172,12 +167,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Добавление маркера
-    fun addMarker(latitude: Double, longitude: Double, title: String = "") {
+    fun addMarker(latitude: Double, longitude: Double, title: String = "", description: String = "") {
         viewModelScope.launch {
             val point = MapPoint(
                 latitude = latitude,
                 longitude = longitude,
                 title = if (title.isBlank()) "Точка ${_markersFlow.value.size + 1}" else title,
+                description = description,
                 timestamp = System.currentTimeMillis()
             )
             repository.insertPoint(point.toEntity())
@@ -260,14 +256,14 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val lat = _formState.value.latitude.toDoubleOrNull()
         val lng = _formState.value.longitude.toDoubleOrNull()
         if (lat == null || lng == null) return false
-
         val title = if (_formState.value.title.isBlank()) {
             "Точка ${_markersFlow.value.size + 1}"
         } else {
             _formState.value.title
         }
+        val description = _formState.value.description
 
-        addMarker(lat, lng, title)
+        addMarker(lat, lng, title, description)
         clearForm()
         return true
     }

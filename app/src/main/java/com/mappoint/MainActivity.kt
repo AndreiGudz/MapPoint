@@ -1,20 +1,17 @@
 package com.mappoint
 
-import android.Manifest
-import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
 import com.mappoint.ui.screens.OfflineMapApp
 import com.mappoint.ui.theme.MapPointTheme
 import org.osmdroid.config.Configuration
 import java.io.File
+
 /*
 Based on OSMDroid (Apache 2.0 license)
  */

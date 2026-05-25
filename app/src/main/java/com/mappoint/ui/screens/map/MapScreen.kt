@@ -64,7 +64,8 @@ fun MapScreen(
                 MarkerData(
                     latitude = point.latitude,
                     longitude = point.longitude,
-                    title = point.title
+                    title = point.title,
+                    description = point.description
                 )
             }
         }
@@ -131,7 +132,7 @@ fun MapScreen(
                         // Кнопка центрирования на текущем местоположении
                         IconButton(
                             onClick = onCurrentPosition,
-                            modifier = Modifier
+                            modifier = Modifier.testTag("MyLocationButton")
                         ) {
                             Icon(Icons.Default.MyLocation, contentDescription = "Моё местоположение")
                         }
@@ -139,7 +140,7 @@ fun MapScreen(
                         // Кнопка перехода в Bluetooth экран
                         IconButton(
                             onClick = onNavigateToBluetooth,
-                            modifier = Modifier
+                            modifier = Modifier.testTag("BluetoothNavigationButton")
                         ) {
                             Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth")
                         }

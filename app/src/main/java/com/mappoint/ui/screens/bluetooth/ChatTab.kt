@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.GpsNotFixed
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mappoint.bluetooth.BluetoothData
 import com.mappoint.bluetooth.DataType
@@ -38,6 +40,7 @@ fun ChatTab(
     inputText: String,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
+    onRequestGps: () -> Unit,
     onClear: () -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -50,7 +53,7 @@ fun ChatTab(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize().testTag("ChatTab")
     ) {
         LazyColumn(
             modifier = Modifier
@@ -95,6 +98,17 @@ fun ChatTab(
                 placeholder = { Text("Введите сообщение...") },
                 singleLine = true
             )
+
+            IconButton(
+                onClick = { onRequestGps() },
+                modifier = Modifier.testTag("RequestGpsButton")
+            ) {
+                Icon(
+                    Icons.Default.GpsNotFixed,
+                    contentDescription = "Запросить GPS",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
 
             IconButton(onClick = onSend) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить")

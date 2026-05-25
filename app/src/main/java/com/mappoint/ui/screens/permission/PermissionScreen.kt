@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mappoint.utils.*
@@ -65,7 +66,8 @@ fun PermissionScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            .testTag("PermissionScreen"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -150,7 +152,9 @@ fun PermissionScreen(
                                 )
                             )
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("GrantLocationPermissionButton")
                     ) {
                         Text("Разрешить доступ к местоположению")
                     }
@@ -160,7 +164,9 @@ fun PermissionScreen(
                             // Пропускаем запрос разрешений
                             onAllPermissionsGranted()
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("ContinueWithoutPermissionButton"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -190,7 +196,7 @@ fun PermissionScreen(
                     text = "• Способен работать оффлайн оффлайн\n" +
                             "• Сохраняет карты для автономного использования\n" +
                             "• Добавление точек по координатам\n" +
-                            "• TODO: Поддержка Bluetooth/Wi-Fi для получения данных",
+                            "• Поддержка Bluetooth для получения и отправки данных",
                     style = MaterialTheme.typography.bodySmall
                 )
             }

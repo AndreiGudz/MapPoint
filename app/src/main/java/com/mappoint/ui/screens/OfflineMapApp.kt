@@ -72,9 +72,11 @@ fun OfflineMapApp(
             composable(Screen.Bluetooth.route) {
                 BluetoothScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onGpsDataReceived = { latitude, longitude ->
+                    onGpsDataReceived = { latitude, longitude, title, description ->
+                        val finalTitle = if (title.isNullOrBlank()) "From ESP32" else title
+                        val finalDescription = description ?: ""
                         // Автоматически добавляем точку на карту при получении GPS данных
-                        mapViewModel.addMarker(latitude, longitude, "From ESP32")
+                        mapViewModel.addMarker(latitude, longitude, finalTitle, finalDescription)
                         navController.popBackStack()
                     }
                 )

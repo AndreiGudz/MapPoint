@@ -1,7 +1,7 @@
 package com.mappoint
 
 import com.mappoint.ui.screens.map.MapPoint
-import org.junit.Assert.assertEquals
+import org.junit.Assert
 import org.junit.Test
 
 class MapPointTest {
@@ -16,9 +16,9 @@ class MapPointTest {
             description = "Тест"
         )
 
-        assertEquals(55.7558, point.latitude, 0.0)
-        assertEquals(37.6176, point.longitude, 0.0)
-        assertEquals("Москва", point.title)
-        assertEquals("Тест", point.description)
+        Assert.assertEquals(55.7558, point.latitude, 0.0)
+        Assert.assertEquals(37.6176, point.longitude, 0.0)
+        Assert.assertEquals("Москва", point.title)
+        Assert.assertEquals("Тест", point.description)
     }
 }

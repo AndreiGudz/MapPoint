@@ -28,6 +28,8 @@ data class BluetoothUiState(
 )
 
 class BluetoothViewModel(application: Application) : AndroidViewModel(application) {
+    private var lastGpsTimestamp = 0L
+    private val GPS_MIN_INTERVAL_MS = 2000L // минимум 2 секунды между маркерами
 
     private val bluetoothManager = BluetoothClassicManager(application)
 
@@ -128,6 +130,25 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
+     * Запрос текущих GPS-координат у ESP32
+     * Отправляет команду {"type":"request_gps"}
+     */
+    fun requestGpsFromDevice() {
+        if (!_uiState.value.hasPermissions) {
+            Log.w("BluetoothVM", "Cannot request GPS: no permissions")
+            return
+        }
+        if (uiState.value.connectionState != ConnectionState.CONNECTED) {
+            Log.w("BluetoothVM", "Cannot request GPS: not connected")
+            return
+        }
+        val requestJson = JSONObject().apply {
+            put("type", "request_gps")
+        }.toString()
+        sendJson(requestJson)
+    }
+
+    /**
      * Отправка произвольной JSON-строки.
      */
     fun sendJson(jsonString: String) {
@@ -135,22 +156,6 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             bluetoothManager.sendJson(jsonString)
         }
-    }
-
-    /**
-     * Удобный метод для отправки GPS-координат в формате JSON.
-     */
-    fun sendGpsData(latitude: Double, longitude: Double, additionalData: Map<String, Any> = emptyMap()) {
-        val jsonObject = JSONObject().apply {
-            put("type", "gps_data")
-            put("latitude", latitude)
-            put("longitude", longitude)
-            put("timestamp", System.currentTimeMillis())
-            additionalData.forEach { (key, value) ->
-                put(key, value)
-            }
-        }
-        sendJson(jsonObject.toString())
     }
 
     private fun addMessage(data: BluetoothData) {
@@ -163,13 +168,21 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun handleIncomingData(data: BluetoothData) {
         // Обрабатываем только JSON-данные
+        val now = System.currentTimeMillis()
+        if (now - lastGpsTimestamp < GPS_MIN_INTERVAL_MS) {
+            Log.d("BluetoothVM", "GPS data ignored (too frequent)")
+            return
+        }
+        lastGpsTimestamp = now
         val json = data.parsedJson ?: return
         when (json["type"]) {
             "gps_data" -> {
                 val lat = (json["latitude"] as? Number)?.toDouble()
                 val lng = (json["longitude"] as? Number)?.toDouble()
+                val title = json["title"] as? String
+                val description = json["description"] as? String
                 if (lat != null && lng != null) {
-                    handleGpsData(lat, lng)
+                    handleGpsData(lat, lng, title, description)
                 }
             }
             // Можно добавить другие типы сообщений от ESP32
@@ -179,11 +192,11 @@ class BluetoothViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun handleGpsData(latitude: Double, longitude: Double) {
-        onGpsDataReceived?.invoke(latitude, longitude)
+    private fun handleGpsData(latitude: Double, longitude: Double, title: String?, description: String?) {
+        onGpsDataReceived?.invoke(latitude, longitude, title, description)
     }
 
-    var onGpsDataReceived: ((Double, Double) -> Unit)? = null
+    var onGpsDataReceived: ((Double, Double, String?, String?) -> Unit)? = null
 
     fun clearMessages() {
         _messages.value = emptyList()

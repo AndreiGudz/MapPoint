@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mappoint.bluetooth.ConnectionState
 
@@ -38,7 +39,7 @@ fun DevicesTab(
     onConnect: (android.bluetooth.BluetoothDevice) -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize().testTag("DevicesTab")
     ) {
         Row(
             modifier = Modifier

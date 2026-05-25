@@ -124,6 +124,7 @@ private fun createMarker(
 ): Marker = Marker(mapView).apply {
     position = GeoPoint(markerData.latitude, markerData.longitude)
     title = markerData.title
+    snippet = markerData.description
     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
     setOnMarkerClickListener(markerClickListener)
     icon = if (markerData.iconResId != null) {
@@ -153,6 +154,7 @@ data class MarkerData(
     val latitude: Double,
     val longitude: Double,
     val title: String = "",
+    val description: String = "",
     val iconResId: Int? = null
 )
 

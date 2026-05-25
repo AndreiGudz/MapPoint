@@ -26,6 +26,7 @@ class CenterMapUiTest {
     @Test
     fun centerMap_buttonClickHandled() {
         composeTestRule.addTestPoint()
-        composeTestRule.onNodeWithTag("CenterLocationButton").performClick()
+        composeTestRule.onNodeWithTag("CenterLocationButton")
+            .performClick()
     }
 }
