@@ -104,12 +104,27 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 _markersFlow.value = points
+
+                // При первом получении точек центрируем на последней
+                if (points.isNotEmpty()) {
+                    val lastPoint = points.maxByOrNull { it.timestamp }
+                    lastPoint?.let {
+                        if (_center.value.latitude == 55.7558 && _center.value.longitude == 37.6173) {
+                            // Центрируем только если карта ещё не была перемещена
+                            setCenter(it.latitude, it.longitude)
+                            setZoom(startZoomLevel)
+                        }
+                    }
+                }
+
                 // Если выбранный маркер был удалён, сбрасываем
                 if (_selectedMarker.value != null && !points.contains(_selectedMarker.value)) {
                     _selectedMarker.value = null
                 }
             }
         }
+
+
 
         // Запускаем подписку на обновления местоположения при создании ViewModel
         viewModelScope.launch {
