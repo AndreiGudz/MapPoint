@@ -1,7 +1,9 @@
 package com.mappoint.ui.screens.bluetooth
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -60,12 +62,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.mappoint.utils.bluetooth.BluetoothClassicManager
-import com.mappoint.utils.bluetooth.BluetoothData
-import com.mappoint.utils.bluetooth.BluetoothPermissionHelper
-import com.mappoint.utils.bluetooth.ConnectionState
-import com.mappoint.utils.bluetooth.DataType
-import com.mappoint.utils.bluetooth.LocationHelper
+import com.mappoint.bluetooth.BluetoothClassicManager
+import com.mappoint.bluetooth.BluetoothData
+import com.mappoint.bluetooth.BluetoothPermissionHelper
+import com.mappoint.bluetooth.ConnectionState
+import com.mappoint.bluetooth.DataType
+import com.mappoint.bluetooth.LocationHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -242,7 +244,7 @@ fun BluetoothScreen(
                         Text("Для поиска Bluetooth требуется включить геолокацию")
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(onClick = {
-                            val enableIntent = LocationHelper.getLocationSettingsIntent()
+                            val enableIntent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
                             enableLocationLauncher.launch(enableIntent)
                         }) {
                             Text("Включить геолокацию")
@@ -267,12 +269,6 @@ fun BluetoothScreen(
                         icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null) },
                         text = { Text("Чат") }
                     )
-                    Tab(
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
-                        icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
-                        text = { Text("Тесты") }
-                    )
                 }
 
                 when (selectedTab) {
@@ -294,318 +290,7 @@ fun BluetoothScreen(
                         },
                         onClear = { bluetoothViewModel.clearMessages() }
                     )
-                    2 -> TestTab(
-                        onSendGpsData = { lat, lng ->
-                            bluetoothViewModel.sendGpsData(lat, lng)
-                        }
-                    )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun DevicesTab(
-    uiState: BluetoothUiState,
-    onStartScan: () -> Unit,
-    onStopScan: () -> Unit,
-    onConnect: (android.bluetooth.BluetoothDevice) -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = onStartScan,
-                modifier = Modifier.weight(1f),
-                enabled = !uiState.isScanning && uiState.isBluetoothEnabled
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Сканировать")
-            }
-
-            Button(
-                onClick = onStopScan,
-                modifier = Modifier.weight(1f),
-                enabled = uiState.isScanning
-            ) {
-                Text("Остановить")
-            }
-        }
-
-        if (uiState.isScanning) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (uiState.discoveredDevices.isEmpty() && !uiState.isScanning) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text(
-                            text = "Нажмите 'Сканировать' для поиска устройств",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            items(uiState.discoveredDevices) { device ->
-                DeviceCard(
-                    device = device,
-                    isConnecting = uiState.connectionState == ConnectionState.CONNECTING,
-                    hasPermissions = uiState.hasPermissions,
-                    onConnect = { onConnect(device) }
-                )
-            }
-        }
-    }
-}
-
-
-@Composable
-fun DeviceCard(
-    device: android.bluetooth.BluetoothDevice,
-    isConnecting: Boolean,
-    hasPermissions: Boolean,
-    onConnect: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !isConnecting) { onConnect() }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                @SuppressLint("MissingPermission")
-                val deviceName = if (hasPermissions) {
-                    device.name ?: "Unknown Device"
-                } else {
-                    "Разрешения не предоставлены"
-                }
-                Text(
-                    text = deviceName,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = device.address,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (isConnecting) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            } else {
-                Button(onClick = onConnect) {
-                    Text("Подключиться")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ChatTab(
-    messages: List<BluetoothData>,
-    inputText: String,
-    onInputChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onClear: () -> Unit
-) {
-    val listState = rememberLazyListState()
-
-    // Автоматическая прокрутка к последнему сообщению при отправке/получении
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (messages.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text(
-                            text = "Нет сообщений",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            items(messages) { message ->
-                MessageBubble(message = message)
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = onInputChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Введите сообщение...") },
-                singleLine = true
-            )
-
-            IconButton(onClick = onSend) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить")
-            }
-
-            IconButton(onClick = onClear) {
-                Icon(Icons.Default.ClearAll, contentDescription = "Очистить")
-            }
-        }
-    }
-}
-
-@Composable
-fun MessageBubble(message: BluetoothData) {
-    val isOutgoing = message.type == DataType.OUTGOING
-    val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
-    ) {
-        Card(
-            modifier = Modifier.widthIn(max = 300.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isOutgoing)
-                    MaterialTheme.colorScheme.primaryContainer
-                else
-                    MaterialTheme.colorScheme.secondaryContainer
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
-            ) {
-                Text(
-                    text = message.data,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = dateFormat.format(Date(message.timestamp)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun TestTab(
-    onSendGpsData: (Double, Double) -> Unit
-) {
-    var testLat by remember { mutableStateOf("55.7558") }
-    var testLng by remember { mutableStateOf("37.6173") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Тестовые данные для ESP32",
-            style = MaterialTheme.typography.titleLarge
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("Отправить GPS координаты (JSON)")
-
-                OutlinedTextField(
-                    value = testLat,
-                    onValueChange = { testLat = it },
-                    label = { Text("Широта") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = testLng,
-                    onValueChange = { testLng = it },
-                    label = { Text("Долгота") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Button(
-                    onClick = {
-                        val lat = testLat.toDoubleOrNull() ?: 55.7558
-                        val lng = testLng.toDoubleOrNull() ?: 37.6173
-                        onSendGpsData(lat, lng)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Отправить JSON")
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Формат JSON:",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
-                    text = "{\"type\":\"gps_data\",\"latitude\":55.7558,\"longitude\":37.6173,\"timestamp\":1234567890}",
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
         }
     }

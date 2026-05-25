@@ -6,6 +6,9 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mappoint.data.AppDatabase
+import com.mappoint.data.PointEntity
+import com.mappoint.data.PointRepository
 import com.mappoint.utils.LocationProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,11 +25,12 @@ import java.util.Locale
 
 // Класс для представления точки на карте
 data class MapPoint(
-    val id: Int? = null,
+    val id: Int = 0,
     val latitude: Double,
     val longitude: Double,
     val title: String = "",
-    val description: String = ""
+    val description: String = "",
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 // Класс для панели ввода
@@ -45,8 +49,9 @@ const val startZoomLevel = 15.0
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Источник текущей позиции
+    // Источник данных
     private val locationProvider = LocationProvider(application)
+    private val repository: PointRepository
 
     // Счётчик для обновления координат
     private val _frame = MutableStateFlow(0)
@@ -65,8 +70,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     val zoomLevel: StateFlow<Double> = _zoomLevel.asStateFlow()
 
     // Список маркеров на карте
-    private val _markers = MutableStateFlow<List<MapPoint>>(emptyList())
-    val markers: StateFlow<List<MapPoint>> = _markers.asStateFlow()
+    private val _markersFlow = MutableStateFlow<List<MapPoint>>(emptyList())
+    val markers: StateFlow<List<MapPoint>> = _markersFlow.asStateFlow()
+
 
     // Текущий выбранный маркер
     private val _selectedMarker = MutableStateFlow<MapPoint?>(null)
@@ -81,6 +87,30 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     val formState: StateFlow<InputFormState> = _formState.asStateFlow()
 
     init {
+        val database = AppDatabase.getInstance(application)
+        repository = PointRepository(database.pointDao())
+
+        // Подписываемся на изменения в БД и преобразуем Entity в MapPoint
+        viewModelScope.launch {
+            repository.getAllPoints().collect { entities ->
+                val points = entities.map { entity ->
+                    MapPoint(
+                        id = entity.id,
+                        latitude = entity.latitude,
+                        longitude = entity.longitude,
+                        title = entity.title,
+                        description = entity.description,
+                        timestamp = entity.timestamp
+                    )
+                }
+                _markersFlow.value = points
+                // Если выбранный маркер был удалён, сбрасываем
+                if (_selectedMarker.value != null && !points.contains(_selectedMarker.value)) {
+                    _selectedMarker.value = null
+                }
+            }
+        }
+
         // Запускаем подписку на обновления местоположения при создании ViewModel
         viewModelScope.launch {
             locationProvider.getLocationFlow().collect { location ->
@@ -127,19 +157,16 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Добавление маркера
-    fun addMarker(point: GeoPoint, title: String = "") {
-        addMarker(point.latitude, point.longitude, title)
-    }
     fun addMarker(latitude: Double, longitude: Double, title: String = "") {
         viewModelScope.launch {
-            val newMarker = MapPoint(
+            val point = MapPoint(
                 latitude = latitude,
                 longitude = longitude,
-                title = if (title.isBlank()) "Точка ${_markers.value.size + 1}" else title
+                title = if (title.isBlank()) "Точка ${_markersFlow.value.size + 1}" else title,
+                timestamp = System.currentTimeMillis()
             )
-
-            _markers.value = _markers.value + newMarker
-            _selectedMarker.value = newMarker
+            repository.insertPoint(point.toEntity())
+            _selectedMarker.value = point
             setCenter(latitude, longitude)
         }
     }
@@ -147,7 +174,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     // Удаление маркера
     fun removeMarker(marker: MapPoint) {
         viewModelScope.launch {
-            _markers.value = _markers.value.filter { it != marker }
+            repository.deletePoint(marker.toEntity())
             if (_selectedMarker.value == marker) {
                 _selectedMarker.value = null
             }
@@ -157,7 +184,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     // Удаление всех маркеров
     fun clearAllMarkers() {
         viewModelScope.launch {
-            _markers.value = emptyList()
+            repository.deleteAllPoints()
             _selectedMarker.value = null
         }
     }
@@ -173,22 +200,16 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     // Получени маркера по широте и долготе
     private fun findMarker(latitude: Double, longitude: Double) : MapPoint? {
-        return _markers.value.find {
+        return _markersFlow.value.find {
             it.latitude == latitude && it.longitude == longitude
         }
-    }
-
-    // Проверка наличия маркеров
-    fun hasMarkers(): Boolean {
-        return _markers.value.isNotEmpty()
     }
 
     // Получить регирование на нажатие на маркер
     fun getMarkerClickListener() : Marker.OnMarkerClickListener {
         return Marker.OnMarkerClickListener { marker, mapView ->
-            marker!!.showInfoWindow()
-            mapView!!.controller
-                .animateTo(marker.position)
+            marker?.showInfoWindow()
+            mapView?.controller?.animateTo(marker.position)
             _selectedMarker.value = findMarker(marker.position.latitude, marker.position.longitude)
             true
         }
@@ -223,11 +244,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun addPointFromForm(): Boolean {
         val lat = _formState.value.latitude.toDoubleOrNull()
         val lng = _formState.value.longitude.toDoubleOrNull()
-
         if (lat == null || lng == null) return false
 
         val title = if (_formState.value.title.isBlank()) {
-            "Точка ${_markers.value.size + 1}"
+            "Точка ${_markersFlow.value.size + 1}"
         } else {
             _formState.value.title
         }
@@ -240,4 +260,14 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun clearForm() {
         _formState.value = InputFormState()
     }
+
+    // Вспомогательная функция преобразования
+    private fun MapPoint.toEntity(): PointEntity = PointEntity(
+        id = this.id,
+        latitude = this.latitude,
+        longitude = this.longitude,
+        title = this.title,
+        description = this.description,
+        timestamp = this.timestamp
+    )
 }

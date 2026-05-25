@@ -55,7 +55,7 @@ fun OsmMapView(
         MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).apply {
             // Настройка оверлея
             enableMyLocation() // Включить определение местоположения
-//            enableFollowLocation() // Карта будет следовать за пользователем
+            enableFollowLocation() // Карта будет следовать за пользователем
             isDrawAccuracyEnabled = true // Отображать радиус точности
         }
 

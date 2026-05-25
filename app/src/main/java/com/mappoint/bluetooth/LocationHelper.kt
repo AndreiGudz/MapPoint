@@ -1,4 +1,4 @@
-package com.mappoint.utils.bluetooth
+package com.mappoint.bluetooth
 
 import android.content.Context
 import android.content.Intent
@@ -14,9 +14,5 @@ object LocationHelper {
         } catch (e: SecurityException) {
             false
         }
-    }
-
-    fun getLocationSettingsIntent(): Intent {
-        return Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
     }
 }

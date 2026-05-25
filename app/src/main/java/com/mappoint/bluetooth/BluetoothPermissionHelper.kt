@@ -1,4 +1,4 @@
-package com.mappoint.utils.bluetooth
+package com.mappoint.bluetooth
 
 import android.Manifest
 import android.content.Context

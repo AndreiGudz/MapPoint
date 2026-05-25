@@ -74,9 +74,8 @@ dependencies {
 
     // OSMdroid - Основная библиотека карт
     implementation("org.osmdroid:osmdroid-android:6.1.20")
-/*    // Room для базы данных (история точек)
+    // Room для базы данных (история точек)
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
-    */
 }

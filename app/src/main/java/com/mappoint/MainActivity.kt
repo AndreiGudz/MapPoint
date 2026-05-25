@@ -15,7 +15,9 @@ import com.mappoint.ui.screens.OfflineMapApp
 import com.mappoint.ui.theme.MapPointTheme
 import org.osmdroid.config.Configuration
 import java.io.File
-
+/*
+Based on OSMDroid (Apache 2.0 license)
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
