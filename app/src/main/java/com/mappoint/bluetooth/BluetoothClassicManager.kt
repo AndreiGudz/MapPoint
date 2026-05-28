@@ -57,7 +57,6 @@ class BluetoothClassicManager(private val context: Context) {
     private val _discoveredDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val discoveredDevices: StateFlow<List<BluetoothDevice>> = _discoveredDevices.asStateFlow()
 
-    // Теперь поток принимает только BluetoothData без бинарных полей
     private val _incomingData = MutableSharedFlow<BluetoothData>()
     val incomingData: SharedFlow<BluetoothData> = _incomingData.asSharedFlow()
 
@@ -239,7 +238,7 @@ class BluetoothClassicManager(private val context: Context) {
     private fun startReceiving() {
         receiveJob?.cancel()
         receiveJob = scope.launch {
-            val buffer = ByteArray(4096) // чуть больше для JSON
+            val buffer = ByteArray(4096)
             while (isActive && _connectionState.value == ConnectionState.CONNECTED) {
                 try {
                     val bytesRead = inputStream?.read(buffer) ?: -1

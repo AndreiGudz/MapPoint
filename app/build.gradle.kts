@@ -70,6 +70,7 @@ dependencies {
     // Room
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
+    implementation(libs.androidx.rules)
     ksp("androidx.room:room-compiler:2.8.4")
 
     // ========== Модульное тестирование ==========
@@ -82,11 +83,8 @@ dependencies {
     // Coroutines Test
     testImplementation(libs.kotlinx.coroutines.test)
 
-    // AndroidX Core Testing (для InstantTaskExecutorRule)
+    // AndroidX Core Testing
     testImplementation(libs.androidx.core.testing)
-
-    // Turbine для тестирования Flow
-    testImplementation("app.cash.turbine:turbine:1.1.0")
 
     // ========== Инструментальное тестирование (Android) ==========
     androidTestImplementation(libs.androidx.junit)

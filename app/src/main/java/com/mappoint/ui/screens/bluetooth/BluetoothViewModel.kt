@@ -29,7 +29,7 @@ data class BluetoothUiState(
 
 class BluetoothViewModel(application: Application) : AndroidViewModel(application) {
     private var lastGpsTimestamp = 0L
-    private val GPS_MIN_INTERVAL_MS = 2000L // минимум 2 секунды между маркерами
+    private val GPS_MIN_INTERVAL_MS = 200L
 
     private val bluetoothManager = BluetoothClassicManager(application)
 

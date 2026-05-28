@@ -1,5 +1,6 @@
 package com.mappoint.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -68,16 +69,16 @@ fun OfflineMapApp(
                 )
             }
 
-            // Экран для взаимодействия с ESP32 по Bluetooth
+            // Экран для взаимодействия с внешним модулем по Bluetooth
             composable(Screen.Bluetooth.route) {
                 BluetoothScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onGpsDataReceived = { latitude, longitude, title, description ->
-                        val finalTitle = if (title.isNullOrBlank()) "From ESP32" else title
-                        val finalDescription = description ?: ""
                         // Автоматически добавляем точку на карту при получении GPS данных
+                        val finalTitle = if (title.isNullOrBlank()) "From module" else title
+                        val finalDescription = description ?: ""
                         mapViewModel.addMarker(latitude, longitude, finalTitle, finalDescription)
-                        navController.popBackStack()
+                        Toast.makeText(context, "add point $finalTitle", Toast.LENGTH_SHORT).show()
                     }
                 )
             }
